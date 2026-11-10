@@ -1,14 +1,14 @@
 import os, re, uuid, socket, ipaddress, subprocess, threading, math
 from pathlib import Path
 from urllib.parse import urlparse
-from fastapi import FastAPI, BackgroundTasks, HTTPException
+from fastapi import FastAPI, BackgroundTasks, HTTPException, UploadFile, File, Form
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 BASE = Path(__file__).resolve().parent
 WORK, OUT = BASE / "work", BASE / "outputs"
 WORK.mkdir(exist_ok=True); OUT.mkdir(exist_ok=True)
-app = FastAPI(title="CortaViral AI", version="1.1")
+app = FastAPI(title="CortaViral AI", version="1.2")
 JOBS, LOCK = {}, threading.Lock()
 MIN_CLIP_SECONDS = 30
 MAX_CLIP_SECONDS = 60
@@ -234,64 +234,113 @@ def render(source, candidate, index, folder, segs):
         run(command, 900)
     return output
 
+def process_source(job, clips, source, folder):
+    total = duration_of(source)
+    if total < MIN_CLIP_SECONDS:
+        raise RuntimeError("O vídeo de origem precisa ter pelo menos 30 segundos.")
+    update(job, progress=20, message="Vídeo recebido. Transcrevendo o conteúdo completo…")
+    try:
+        segs, language = transcribe(source)
+        note = f"Transcrição concluída. Idioma detectado: {language}."
+    except Exception:
+        segs = []
+        note = "Não foi possível transcrever este vídeo; os cortes foram distribuídos por duração, sem análise do conteúdo."
+    update(job, progress=45, message="Encontrando os melhores momentos entre 30 e 60 segundos…")
+    options = candidates(segs, total)
+    chosen = []
+    for candidate in options:
+        if all(
+            candidate["end"] <= item["start"] or candidate["start"] >= item["end"]
+            for item in chosen
+        ):
+            chosen.append(candidate)
+        if len(chosen) >= clips:
+            break
+    if not chosen:
+        raise RuntimeError("Não encontramos trechos de 30 a 60 segundos neste vídeo. Tente outro vídeo ou uma quantidade menor de cortes.")
+    chosen.sort(key=lambda item: item["start"])
+    results = []
+    for index, candidate in enumerate(chosen, 1):
+        update(
+            job,
+            progress=50 + int(45 * (index - 1) / max(1, len(chosen))),
+            message=f"Renderizando corte {index} de {len(chosen)}…"
+        )
+        file = render(source, candidate, index, folder, segs)
+        text = candidate["text"]
+        results.append({
+            "number": index,
+            "score": candidate["score"],
+            "start": round(candidate["start"], 1),
+            "end": round(candidate["end"], 1),
+            "duration": round(candidate["end"] - candidate["start"], 1),
+            "hook": " ".join(text.split()[:9]) or f"Melhor momento {index}",
+            "text": text[:700],
+            "reasons": candidate["reasons"],
+            "url": f"/outputs/{file.name}"
+        })
+    update(
+        job, status="completed", progress=100, message="Cortes prontos!",
+        results=results, transcript_note=note,
+        source_duration=round(total, 1),
+        score_note="A nota é uma estimativa heurística de potencial de retenção; não prevê nem garante viralização."
+    )
+
 def process(job, req):
     folder = WORK / job
     folder.mkdir(parents=True, exist_ok=True)
     try:
         update(job, status="processing", progress=3, message="Validando o link e procurando o vídeo…")
         source = download(validate_url(req.url), folder)
-        total = duration_of(source)
-        if total < MIN_CLIP_SECONDS:
-            raise RuntimeError("O vídeo de origem precisa ter pelo menos 30 segundos.")
-        update(job, progress=20, message="Vídeo recebido. Transcrevendo o conteúdo completo…")
-        try:
-            segs, language = transcribe(source)
-            note = f"Transcrição concluída. Idioma detectado: {language}."
-        except Exception as error:
-            segs = []
-            note = "Não foi possível transcrever este vídeo; os cortes foram distribuídos por duração, sem análise do conteúdo."
-        update(job, progress=45, message="Encontrando os melhores momentos entre 30 e 60 segundos…")
-        options = candidates(segs, total)
-        chosen = []
-        for candidate in options:
-            if all(
-                candidate["end"] <= item["start"] or candidate["start"] >= item["end"]
-                for item in chosen
-            ):
-                chosen.append(candidate)
-            if len(chosen) >= req.clips:
-                break
-        if not chosen:
-            raise RuntimeError("Não encontramos trechos de 30 a 60 segundos neste vídeo. Tente outro vídeo ou uma quantidade menor de cortes.")
-        chosen.sort(key=lambda item: item["start"])
-        results = []
-        for index, candidate in enumerate(chosen, 1):
-            update(
-                job,
-                progress=50 + int(45 * (index - 1) / max(1, len(chosen))),
-                message=f"Renderizando corte {index} de {len(chosen)}…"
-            )
-            file = render(source, candidate, index, folder, segs)
-            text = candidate["text"]
-            results.append({
-                "number": index,
-                "score": candidate["score"],
-                "start": round(candidate["start"], 1),
-                "end": round(candidate["end"], 1),
-                "duration": round(candidate["end"] - candidate["start"], 1),
-                "hook": " ".join(text.split()[:9]) or f"Melhor momento {index}",
-                "text": text[:700],
-                "reasons": candidate["reasons"],
-                "url": f"/outputs/{file.name}"
-            })
-        update(
-            job, status="completed", progress=100, message="Cortes prontos!",
-            results=results, transcript_note=note,
-            source_duration=round(total, 1),
-            score_note="A nota é uma estimativa heurística de potencial de retenção; não prevê nem garante viralização."
-        )
+        process_source(job, req.clips, source, folder)
     except Exception as error:
         update(job, status="error", progress=100, message=str(error)[:1800])
+
+def process_local_upload(job, clips, source, folder):
+    try:
+        update(job, status="processing", progress=15, message="Vídeo recebido. Preparando análise…")
+        process_source(job, clips, source, folder)
+    except Exception as error:
+        update(job, status="error", progress=100, message=str(error)[:1800])
+
+@app.post("/api/analyze-upload")
+async def analyze_upload(
+    background: BackgroundTasks,
+    file: UploadFile = File(...),
+    clips: int = Form(5)
+):
+    if clips < 1 or clips > 10:
+        raise HTTPException(400, "A quantidade de cortes precisa ficar entre 1 e 10.")
+    filename = file.filename or "video.mp4"
+    extension = Path(filename).suffix.lower()
+    allowed = {".mp4", ".mov", ".mkv", ".webm", ".m4v", ".avi", ".flv", ".ts", ".mpg", ".mpeg"}
+    if extension not in allowed:
+        raise HTTPException(415, "Formato de vídeo não suportado. Use MP4, MOV, MKV, WEBM ou AVI.")
+    if file.content_type and not file.content_type.startswith("video/") and file.content_type != "application/octet-stream":
+        raise HTTPException(415, "O arquivo enviado não foi identificado como vídeo.")
+    job = uuid.uuid4().hex[:12]
+    folder = WORK / job
+    folder.mkdir(parents=True, exist_ok=True)
+    destination = folder / ("source" + extension)
+    try:
+        with destination.open("wb") as output:
+            while True:
+                chunk = await file.read(1024 * 1024)
+                if not chunk:
+                    break
+                output.write(chunk)
+    except Exception:
+        destination.unlink(missing_ok=True)
+        raise HTTPException(400, "Não foi possível receber o arquivo de vídeo.")
+    finally:
+        await file.close()
+    if destination.stat().st_size == 0:
+        destination.unlink(missing_ok=True)
+        raise HTTPException(400, "O arquivo de vídeo está vazio.")
+    with LOCK:
+        JOBS[job] = {"status": "queued", "progress": 5, "message": "Vídeo enviado. Entrando na fila…"}
+    background.add_task(process_local_upload, job, clips, destination, folder)
+    return {"job_id": job}
 
 @app.post("/api/analyze")
 def analyze(req: AnalyzeRequest, background: BackgroundTasks):
@@ -310,7 +359,7 @@ def status(job):
 
 @app.get("/api/health")
 def health():
-    return {"ok": True, "app": "CortaViral AI", "version": "1.1"}
+    return {"ok": True, "app": "CortaViral AI", "version": "1.2"}
 
 app.mount("/outputs", StaticFiles(directory=str(OUT)), name="outputs")
 app.mount("/", StaticFiles(directory=str(BASE / "static"), html=True), name="static")
