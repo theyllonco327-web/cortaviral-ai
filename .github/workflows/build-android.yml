@@ -40,6 +40,8 @@ jobs:
           cat .android-source/android-patch-01.b64 .android-source/android-patch-02.b64 .android-source/android-patch-03.b64 | base64 --decode > android-java-patch.zip
           unzip -t android-java-patch.zip
           unzip -oq android-java-patch.zip -d android
+      - name: Atualizar interface multiplataforma e validar servidor no app
+        run: python scripts/patch_android.py
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
