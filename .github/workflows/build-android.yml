@@ -50,6 +50,21 @@ jobs:
       - name: Build debug APK
         working-directory: android
         run: gradle assembleDebug --no-daemon
+      - name: Package Android source for inspection
+        if: always()
+        run: |
+          mkdir -p inspection
+          cp -R android/app/src inspection/src
+          cp android/app/build.gradle inspection/ 2>/dev/null || true
+          cp android/build.gradle inspection/ 2>/dev/null || true
+          cd inspection && zip -qr ../android-source-inspection.zip .
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cortaviral-android-source-inspection
+          path: android-source-inspection.zip
+          if-no-files-found: warn
+          retention-days: 7
       - uses: actions/upload-artifact@v4
         with:
           name: cortaviral-ai-debug-apk
