@@ -8,6 +8,8 @@ on:
       - 'scripts/**'
       - 'app.py'
       - 'requirements.txt'
+      - 'Dockerfile'
+      - 'render.yaml'
       - 'README.md'
       - '.github/workflows/build-android.yml'
   workflow_dispatch:
