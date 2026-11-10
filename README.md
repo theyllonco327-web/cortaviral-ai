@@ -1,61 +1,33 @@
 # CortaViral AI
 
-Aplicativo web para analisar vídeos por URL, encontrar trechos com sinais de potencial de retenção e exportar cortes verticais MP4 com legendas automáticas.
+O CortaViral AI agora possui um backend FastAPI e um aplicativo Android nativo.
 
-## Recursos da versão 1.1
-- Compatibilidade ampla com sites suportados pelo yt-dlp e links diretos de mídia.
-- Sem limite artificial de duração do vídeo original configurado no aplicativo.
-- Sem limite fixo de tamanho de arquivo configurado no yt-dlp.
-- Transcrição do conteúdo com Faster-Whisper.
-- Seleção de cortes entre **30 e 60 segundos**.
-- Ranking heurístico baseado em curiosidade, emoção, ritmo e densidade de fala.
-- Exportação MP4 vertical 9:16 com legendas automáticas.
-- Acompanhamento do processamento e download dos cortes.
+## Gerar o APK
+1. Abra a aba **Actions** deste repositório.
+2. Selecione **Build CortaViral AI APK**.
+3. Aguarde os jobs **backend-check** e **build-apk** concluírem com sucesso.
+4. Abra a execução e baixe o artefato **cortaviral-ai-debug-apk**.
+5. Extraia o arquivo baixado e instale `app-debug.apk` no Android.
 
-## Tecnologias
-- Python 3.11
-- FastAPI
-- yt-dlp
-- Faster-Whisper
-- FFmpeg / FFprobe
-- HTML, CSS e JavaScript
+O workflow também pode ser iniciado manualmente em **Actions → Build CortaViral AI APK → Run workflow**.
 
-## Executar localmente
+## Recursos do app Android
+- Interface nativa em preto com contornos e destaques verde neon.
+- Foto enviada pelo usuário na capa.
+- Análise de vídeos por URL.
+- Seleção e envio de vídeos da galeria do Android.
+- Acompanhamento do processamento.
+- Download dos cortes MP4 gerados.
+- Cortes com duração entre **30 e 60 segundos**.
+- Campo para configurar o endereço HTTPS do backend Render.
 
-Instale Python 3.11+ e FFmpeg/FFprobe.
+## Configuração do servidor
+Na primeira abertura, informe a URL HTTPS pública do serviço Render. O app utiliza:
+- `POST /api/analyze` para vídeos por URL;
+- `POST /api/analyze-upload` para vídeos selecionados no celular;
+- `GET /api/jobs/{job_id}` para acompanhar o processamento.
 
-### Windows
-```powershell
-python -m venv .venv
-.venv\\Scripts\\activate
-pip install -r requirements.txt
-uvicorn app:app --host 127.0.0.1 --port 8000
-```
+## Limites reais
+A aplicação não impõe limite artificial de duração ao vídeo original, mas o servidor ainda depende de CPU, RAM, espaço em disco, conexão e limites de execução do provedor. O yt-dlp suporta muitos sites, mas não garante qualquer URL. Vídeos privados, DRM, paywalls e links que exigem autenticação podem falhar. Use somente vídeos que você tenha autorização para baixar e editar.
 
-### Linux / macOS
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn app:app --host 127.0.0.1 --port 8000
-```
-
-Abra http://127.0.0.1:8000 no navegador.
-
-## Publicação
-O repositório inclui Dockerfile e render.yaml para serviços compatíveis com Docker, como Render. Um novo commit na branch principal pode iniciar um deploy automático se o serviço estiver configurado para auto-deploy.
-
-## Limites reais de processamento
-O aplicativo não define um limite fixo de duração do vídeo original nem de tamanho de download no yt-dlp. Isso **não significa processamento infinito**: CPU, RAM, disco, velocidade da conexão, tempo de execução do provedor e armazenamento temporário continuam sendo limites reais. Instâncias gratuitas podem dormir, reiniciar, ter pouco espaço e perder arquivos temporários. Vídeos muito longos podem demorar bastante ou exceder os recursos disponíveis.
-
-## Compatibilidade e direitos autorais
-O yt-dlp suporta muitos sites, mas nenhum programa consegue garantir download de qualquer URL. Links privados, DRM, vídeos que exigem autenticação, paywalls e plataformas que bloqueiam extração podem falhar. O aplicativo não tenta contornar DRM ou controles de acesso. Use apenas vídeos próprios, licenciados ou cujo download e edição você tenha autorização para fazer.
-
-## Sobre a pontuação
-A nota de 0 a 100 é uma estimativa heurística baseada na transcrição, em sinais de curiosidade e emoção e no ritmo da fala. Não é uma previsão confiável de visualizações e não garante viralização. Se a transcrição falhar, a versão atual seleciona janelas válidas por duração, mas não consegue avaliar semanticamente esses trechos.
-
-## Melhorias futuras
-- Rastreamento de rosto e reenquadramento vertical inteligente.
-- Mais estilos de legenda e modelos de título/gancho.
-- Fila de tarefas, autenticação, histórico e armazenamento persistente.
-- Métricas reais dos vídeos publicados para calibrar o ranking.
+A nota de potencial viral é heurística e não garante visualizações.

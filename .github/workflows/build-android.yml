@@ -1,0 +1,53 @@
+name: Build CortaViral AI APK
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.android-source/**'
+      - 'app.py'
+      - 'requirements.txt'
+      - 'README.md'
+      - '.github/workflows/build-android.yml'
+  workflow_dispatch:
+
+jobs:
+  backend-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Check backend syntax and upload endpoint
+        run: |
+          python -m pip install fastapi pydantic python-multipart
+          python -m py_compile app.py
+          python -c "import app; assert app.health()['version'] == '1.2'; print('Backend import OK')"
+
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reassemble Android project archive
+        run: |
+          cat .android-source/part-*.b64 | tr -d '\n' | base64 --decode > android-source.zip
+          unzip -t android-source.zip
+          mkdir -p android
+          unzip -q android-source.zip -d android
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Build debug APK
+        working-directory: android
+        run: gradle assembleDebug --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cortaviral-ai-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
