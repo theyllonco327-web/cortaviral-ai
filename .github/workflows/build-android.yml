@@ -19,11 +19,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Check backend syntax and upload endpoint
+      - name: Check backend syntax and API health
         run: |
           python -m pip install fastapi pydantic python-multipart
           python -m py_compile app.py
-          python -c "import app; assert app.health()['version'] == '1.2'; print('Backend import OK')"
+          python -c "import app; h=app.health(); assert h['ok'] and h['version'] == '1.2'; print('Backend API health OK')"
 
   build-apk:
     runs-on: ubuntu-latest
@@ -35,6 +35,11 @@ jobs:
           unzip -t android-source.zip
           mkdir -p android
           unzip -q android-source.zip -d android
+      - name: Apply API response validation fix
+        run: |
+          cat .android-source/android-patch-01.b64 .android-source/android-patch-02.b64 .android-source/android-patch-03.b64 | base64 --decode > android-java-patch.zip
+          unzip -t android-java-patch.zip
+          unzip -oq android-java-patch.zip -d android
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
