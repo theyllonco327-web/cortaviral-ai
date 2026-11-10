@@ -79,5 +79,107 @@ replace_once(
     "validação do servidor salvo"
 )
 
+replace_once(
+    '''    private void beginPolling(String jobId) {
+        runOnUiThread(() -> setBusy(true, "Vídeo recebido. Iniciando análise…", 8));
+        executor.schedule(() -> poll(jobId), 2, TimeUnit.SECONDS);
+    }
+
+    private void poll(String jobId) {
+        try {
+            JSONObject job = requestJson("GET", apiBase() + "/api/jobs/" + jobId, null);
+            String state = job.optString("status", "processing");
+            int progress = job.optInt("progress", 0);
+            String message = job.optString("message", "Analisando vídeo…");
+            runOnUiThread(() -> setBusy(true, message, progress));
+            if ("completed".equals(state)) {
+                runOnUiThread(() -> showResults(job));
+            } else if ("error".equals(state)) {
+                showError(job.optString("message", "Falha ao processar o vídeo."));
+            } else {
+                executor.schedule(() -> poll(jobId), 4, TimeUnit.SECONDS);
+            }
+        } catch (Exception error) {
+            runOnUiThread(() -> statusText.setText("Reconectando ao servidor…"));
+            executor.schedule(() -> poll(jobId), 7, TimeUnit.SECONDS);
+        }
+    }
+''',
+    '''    private void beginPolling(String jobId) {
+        runOnUiThread(() -> setBusy(true, "Vídeo recebido. Iniciando análise…", 8));
+        long startedAt = android.os.SystemClock.elapsedRealtime();
+        executor.schedule(() -> poll(jobId, 0, startedAt), 2, TimeUnit.SECONDS);
+    }
+
+    private void poll(String jobId, int failures, long startedAt) {
+        if (android.os.SystemClock.elapsedRealtime() - startedAt > TimeUnit.MINUTES.toMillis(45)) {
+            showError("A análise ultrapassou 45 minutos. O servidor pode estar sem recursos; tente novamente mais tarde.");
+            return;
+        }
+        try {
+            JSONObject job = requestJson("GET", apiBase() + "/api/jobs/" + jobId, null);
+            String state = job.optString("status", "processing");
+            int progress = job.optInt("progress", 0);
+            String message = job.optString("message", "Analisando vídeo…");
+            runOnUiThread(() -> setBusy(true, message, progress));
+            if ("completed".equals(state)) {
+                runOnUiThread(() -> showResults(job));
+            } else if ("error".equals(state)) {
+                showError(job.optString("message", "Falha ao processar o vídeo."));
+            } else if ("queued".equals(state) || "processing".equals(state)) {
+                executor.schedule(() -> poll(jobId, 0, startedAt), 5, TimeUnit.SECONDS);
+            } else {
+                showError("O servidor retornou um estado de análise desconhecido: " + state);
+            }
+        } catch (Exception error) {
+            String detail = error.getMessage() == null ? "" : error.getMessage();
+            if (detail.contains("HTTP 404")) {
+                showError("A tarefa de análise não está mais disponível. O servidor pode ter reiniciado; envie o vídeo novamente.");
+                return;
+            }
+            int nextFailures = failures + 1;
+            if (nextFailures >= 6) {
+                showError("Não foi possível recuperar a análise após 6 tentativas. Último erro: " + detail);
+                return;
+            }
+            int attempt = nextFailures;
+            runOnUiThread(() -> statusText.setText("Reconectando ao servidor (" + attempt + "/6)…"));
+            executor.schedule(() -> poll(jobId, nextFailures, startedAt), 5, TimeUnit.SECONDS);
+        }
+    }
+''',
+    "polling com limite de tentativas e timeout"
+)
+
+replace_once(
+    '''    private void showError(String message) {
+        runOnUiThread(() -> {
+            setBusy(false, "Não foi possível concluir a análise.", 0);
+            statusText.setTextColor(0xFFFF8A8A);
+            String detail = (message == null || message.trim().isEmpty())
+                    ? "Erro de conexão. Confira a URL do servidor nas configurações ⚙."
+                    : message;
+            toast(detail);
+        });
+    }
+''',
+    '''    private void showError(String message) {
+        runOnUiThread(() -> {
+            setBusy(false, "Não foi possível concluir a análise.", 0);
+            String detail = (message == null || message.trim().isEmpty())
+                    ? "Erro de conexão. Confira a URL do servidor nas configurações ⚙."
+                    : message;
+            statusText.setText("Falha: " + (detail.length() > 220 ? detail.substring(0, 220) + "…" : detail));
+            statusText.setTextColor(0xFFFF8A8A);
+            resultsBox.removeAllViews();
+            TextView details = text(detail, 11, MUTED, false);
+            resultsBox.addView(details);
+            toast(detail);
+        });
+    }
+''',
+    "exibição do erro completo"
+)
+
 path.write_text(source, encoding="utf-8")
-print("Android: chips de origem, layout refinado e validação do servidor aplicados.")
+print("Android: interface preservada; polling limitado, timeout e erro detalhado aplicados.")

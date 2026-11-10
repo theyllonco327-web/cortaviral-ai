@@ -1,4 +1,4 @@
-import os, re, uuid, socket, ipaddress, subprocess, threading, math
+import os, re, uuid, socket, ipaddress, subprocess, threading, math, json
 from pathlib import Path
 from urllib.parse import urlparse
 from fastapi import FastAPI, BackgroundTasks, HTTPException, UploadFile, File, Form
@@ -10,6 +10,9 @@ WORK, OUT = BASE / "work", BASE / "outputs"
 WORK.mkdir(exist_ok=True); OUT.mkdir(exist_ok=True)
 app = FastAPI(title="CortaViral AI", version="1.3")
 JOBS, LOCK = {}, threading.Lock()
+MODEL_LOCK = threading.Lock()
+WHISPER_INSTANCE = None
+WHISPER_INSTANCE_NAME = None
 MIN_CLIP_SECONDS = 30
 MAX_CLIP_SECONDS = 60
 
@@ -19,7 +22,16 @@ class AnalyzeRequest(BaseModel):
 
 def update(job, **data):
     with LOCK:
-        JOBS[job].update(data)
+        state = JOBS.setdefault(job, {})
+        state.update(data)
+        snapshot = dict(state)
+    # Persiste cada etapa para que o app receba um erro explícito se o
+    # processo do servidor reiniciar durante uma análise.
+    folder = WORK / job
+    folder.mkdir(parents=True, exist_ok=True)
+    temporary = folder / "job.json.tmp"
+    temporary.write_text(json.dumps(snapshot, ensure_ascii=False), encoding="utf-8")
+    temporary.replace(folder / "job.json")
 
 def run(cmd, timeout=900):
     p = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
@@ -47,19 +59,42 @@ def validate_url(url):
     return url.strip()
 
 def download(url, folder):
-    # yt-dlp cobre centenas de sites e também links diretos de mídia.
-    # Não há limite artificial de duração nem de tamanho configurado aqui.
-    # O tempo de download depende da origem, rede e recursos disponíveis no servidor.
-    run([
+    # yt-dlp cobre centenas de sites e links diretos, mas plataformas podem
+    # bloquear extrações automatizadas ou exigir que o vídeo seja público.
+    host = (urlparse(url).hostname or "").lower()
+    is_tiktok = host == "tiktok.com" or host.endswith(".tiktok.com")
+    command = [
         "yt-dlp", "--js-runtimes", "deno", "--no-playlist", "--no-warnings", "--no-progress",
         "--socket-timeout", "30", "--retries", "5",
-        "--fragment-retries", "5", "--extractor-retries", "3",
-        "--concurrent-fragments", "4",
+        "--fragment-retries", "5", "--extractor-retries", "5",
+        "--concurrent-fragments", "2",
         "-f", "bv*+ba/b",
         "--merge-output-format", "mp4",
         "-o", str(folder / "source.%(ext)s"),
-        url
-    ], timeout=None)
+    ]
+    if is_tiktok:
+        # Cabeçalhos de navegador melhoram compatibilidade, mas não contornam
+        # vídeos privados, autenticação ou bloqueios impostos pelo TikTok.
+        command += [
+            "--referer", "https://www.tiktok.com/",
+            "--user-agent",
+            "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36",
+        ]
+    command.append(url)
+    try:
+        run(command, timeout=1800)
+    except RuntimeError as error:
+        detail = str(error)
+        lowered = detail.lower()
+        if is_tiktok and ("no video" in lowered or "video not available" in lowered
+                          or "ip address is blocked" in lowered):
+            raise RuntimeError(
+                "O TikTok não disponibilizou o arquivo de vídeo ao servidor. "
+                "Confirme que a publicação é pública e tente o link completo do vídeo. "
+                "Se o TikTok continuar bloqueando o acesso, importe o MP4 pela galeria."
+            ) from error
+        raise
     extensions = {".mp4", ".mkv", ".webm", ".mov", ".m4v", ".avi", ".flv", ".ts", ".mpg", ".mpeg", ".3gp", ".3g2"}
     files = [p for p in folder.glob("source.*") if p.suffix.lower() in extensions and p.is_file()]
     if not files:
@@ -73,13 +108,33 @@ def duration_of(path):
     ], 60))
 
 def transcribe(path):
+    global WHISPER_INSTANCE, WHISPER_INSTANCE_NAME
     from faster_whisper import WhisperModel
-    model = WhisperModel(os.getenv("WHISPER_MODEL", "base"), device="cpu", compute_type="int8")
-    segments, info = model.transcribe(str(path), beam_size=3, vad_filter=True)
-    data = [
-        {"start": float(s.start), "end": float(s.end), "text": s.text.strip()}
-        for s in segments if s.text and s.text.strip()
-    ]
+    model_name = (os.getenv("WHISPER_MODEL", "tiny").strip() or "tiny")
+    cpu_threads = max(1, min(2, int(os.getenv("WHISPER_CPU_THREADS", "1"))))
+    # Um modelo compartilhado evita recarregar pesos e multiplicar o uso de RAM.
+    # A transcrição é serializada para respeitar a memória do plano gratuito.
+    with MODEL_LOCK:
+        if WHISPER_INSTANCE is None or WHISPER_INSTANCE_NAME != model_name:
+            WHISPER_INSTANCE = WhisperModel(
+                model_name,
+                device="cpu",
+                compute_type="int8",
+                cpu_threads=cpu_threads,
+                num_workers=1,
+            )
+            WHISPER_INSTANCE_NAME = model_name
+        segments, info = WHISPER_INSTANCE.transcribe(
+            str(path),
+            beam_size=1,
+            best_of=1,
+            vad_filter=True,
+            condition_on_previous_text=False,
+        )
+        data = [
+            {"start": float(s.start), "end": float(s.end), "text": s.text.strip()}
+            for s in segments if s.text and s.text.strip()
+        ]
     return data, getattr(info, "language", "detectado")
 
 HOOKS = [
@@ -218,20 +273,21 @@ def render(source, candidate, index, folder, segs):
             "Alignment=2,MarginV=110'"
         )
     command = [
-        "ffmpeg", "-y", "-ss", str(start), "-i", str(source),
+        "ffmpeg", "-y", "-threads", "1", "-filter_threads", "1",
+        "-ss", str(start), "-i", str(source),
         "-t", str(duration), "-vf", video_filter,
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
-        "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart",
+        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23", "-threads", "1",
+        "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart",
         str(output)
     ]
     try:
-        run(command, 900)
+        run(command, 1800)
     except Exception:
         # Se o filtro de legendas falhar, ainda entrega o corte vertical.
         command[command.index("-vf") + 1] = (
             "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1"
         )
-        run(command, 900)
+        run(command, 1800)
     return output
 
 def process_source(job, clips, source, folder):
@@ -242,9 +298,12 @@ def process_source(job, clips, source, folder):
     try:
         segs, language = transcribe(source)
         note = f"Transcrição concluída. Idioma detectado: {language}."
-    except Exception:
+    except Exception as error:
         segs = []
-        note = "Não foi possível transcrever este vídeo; os cortes foram distribuídos por duração, sem análise do conteúdo."
+        note = (
+            "A transcrição não ficou disponível (" + str(error)[:220] +
+            "). Os cortes foram distribuídos por duração, sem análise semântica do conteúdo."
+        )
     update(job, progress=45, message="Encontrando os melhores momentos entre 30 e 60 segundos…")
     options = candidates(segs, total)
     chosen = []
@@ -337,32 +396,50 @@ async def analyze_upload(
     if destination.stat().st_size == 0:
         destination.unlink(missing_ok=True)
         raise HTTPException(400, "O arquivo de vídeo está vazio.")
-    with LOCK:
-        JOBS[job] = {"status": "queued", "progress": 5, "message": "Vídeo enviado. Entrando na fila…"}
+    update(job, status="queued", progress=5, message="Vídeo enviado. Entrando na fila…")
     background.add_task(process_local_upload, job, clips, destination, folder)
     return {"job_id": job}
 
 @app.post("/api/analyze")
 def analyze(req: AnalyzeRequest, background: BackgroundTasks):
     job = uuid.uuid4().hex[:12]
-    with LOCK:
-        JOBS[job] = {"status": "queued", "progress": 0, "message": "Na fila…"}
+    (WORK / job).mkdir(parents=True, exist_ok=True)
+    update(job, status="queued", progress=0, message="Na fila…")
     background.add_task(process, job, req)
     return {"job_id": job}
 
 @app.get("/api/jobs/{job}")
 def status(job):
     with LOCK:
-        if job not in JOBS:
-            raise HTTPException(404, "Análise não encontrada.")
-        return JOBS[job]
+        current = JOBS.get(job)
+        if current is not None:
+            return dict(current)
+    state_file = WORK / job / "job.json"
+    if not state_file.is_file():
+        raise HTTPException(404, "Análise não encontrada ou tarefa expirada.")
+    try:
+        saved = json.loads(state_file.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        raise HTTPException(500, "Não foi possível recuperar o estado desta análise.")
+    if saved.get("status") in ("queued", "processing"):
+        saved.update({
+            "status": "error",
+            "progress": 100,
+            "message": (
+                "O servidor foi reiniciado durante esta análise. "
+                "Envie o vídeo novamente; o aplicativo não continuará consultando uma tarefa perdida."
+            ),
+        })
+        state_file.write_text(json.dumps(saved, ensure_ascii=False), encoding="utf-8")
+    return saved
 
 @app.get("/api/health")
 def health():
     return {
         "ok": True,
         "app": "CortaViral AI",
-        "version": "1.3",
+        "version": "1.4",
+        "whisper_model": os.getenv("WHISPER_MODEL", "tiny"),
         "sources": ["youtube", "tiktok", "direct_video_url", "gallery_upload"],
         "clip_duration_seconds": {"minimum": MIN_CLIP_SECONDS, "maximum": MAX_CLIP_SECONDS},
         "upload_endpoint": "/api/analyze-upload",

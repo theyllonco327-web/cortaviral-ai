@@ -5,4 +5,6 @@ services:
     plan: free
     envVars:
       - key: WHISPER_MODEL
-        value: base
+        value: tiny
+      - key: WHISPER_CPU_THREADS
+        value: '1'
