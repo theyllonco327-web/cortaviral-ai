@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 BASE = Path(__file__).resolve().parent
 WORK, OUT = BASE / "work", BASE / "outputs"
 WORK.mkdir(exist_ok=True); OUT.mkdir(exist_ok=True)
-app = FastAPI(title="CortaViral AI", version="1.2")
+app = FastAPI(title="CortaViral AI", version="1.3")
 JOBS, LOCK = {}, threading.Lock()
 MIN_CLIP_SECONDS = 30
 MAX_CLIP_SECONDS = 60
@@ -60,7 +60,7 @@ def download(url, folder):
         "-o", str(folder / "source.%(ext)s"),
         url
     ], timeout=None)
-    extensions = {".mp4", ".mkv", ".webm", ".mov", ".m4v", ".avi", ".flv", ".ts", ".mpg", ".mpeg"}
+    extensions = {".mp4", ".mkv", ".webm", ".mov", ".m4v", ".avi", ".flv", ".ts", ".mpg", ".mpeg", ".3gp", ".3g2"}
     files = [p for p in folder.glob("source.*") if p.suffix.lower() in extensions and p.is_file()]
     if not files:
         raise RuntimeError("Não foi possível obter o vídeo. O site pode não ser compatível, exigir login ou bloquear o download.")
@@ -290,7 +290,7 @@ def process(job, req):
     folder = WORK / job
     folder.mkdir(parents=True, exist_ok=True)
     try:
-        update(job, status="processing", progress=3, message="Validando o link e procurando o vídeo…")
+        update(job, status="processing", progress=3, message="Validando link do YouTube, TikTok ou outra fonte compatível…")
         source = download(validate_url(req.url), folder)
         process_source(job, req.clips, source, folder)
     except Exception as error:
@@ -313,7 +313,7 @@ async def analyze_upload(
         raise HTTPException(400, "A quantidade de cortes precisa ficar entre 1 e 10.")
     filename = file.filename or "video.mp4"
     extension = Path(filename).suffix.lower()
-    allowed = {".mp4", ".mov", ".mkv", ".webm", ".m4v", ".avi", ".flv", ".ts", ".mpg", ".mpeg"}
+    allowed = {".mp4", ".mov", ".mkv", ".webm", ".m4v", ".avi", ".flv", ".ts", ".mpg", ".mpeg", ".3gp", ".3g2"}
     if extension not in allowed:
         raise HTTPException(415, "Formato de vídeo não suportado. Use MP4, MOV, MKV, WEBM ou AVI.")
     if file.content_type and not file.content_type.startswith("video/") and file.content_type != "application/octet-stream":
@@ -359,7 +359,7 @@ def status(job):
 
 @app.get("/api/health")
 def health():
-    return {"ok": True, "app": "CortaViral AI", "version": "1.2"}
+    return {\n        "ok": True,\n        "app": "CortaViral AI",\n        "version": "1.3",\n        "sources": ["youtube", "tiktok", "direct_video_url", "gallery_upload"],\n        "clip_duration_seconds": {"minimum": MIN_CLIP_SECONDS, "maximum": MAX_CLIP_SECONDS},\n        "upload_endpoint": "/api/analyze-upload",\n        "url_endpoint": "/api/analyze"\n    }
 
 app.mount("/outputs", StaticFiles(directory=str(OUT)), name="outputs")
 app.mount("/", StaticFiles(directory=str(BASE / "static"), html=True), name="static")
