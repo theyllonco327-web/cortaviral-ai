@@ -23,11 +23,11 @@ O workflow também pode ser iniciado manualmente em **Actions → Build CortaVir
 
 ## Configuração do servidor
 Na primeira abertura, informe a URL HTTPS pública do serviço Render. O app utiliza:
-- `POST /api/analyze` para vídeos por URL;
+- `POST /api/analyze` para links do YouTube, TikTok e outras fontes compatíveis;
 - `POST /api/analyze-upload` para vídeos selecionados no celular;
 - `GET /api/jobs/{job_id}` para acompanhar o processamento.
 
 ## Limites reais
-A aplicação não impõe limite artificial de duração ao vídeo original, mas o servidor ainda depende de CPU, RAM, espaço em disco, conexão e limites de execução do provedor. O yt-dlp suporta muitos sites, mas não garante qualquer URL. Vídeos privados, DRM, paywalls e links que exigem autenticação podem falhar. Use somente vídeos que você tenha autorização para baixar e editar.
+A aplicação não impõe limite artificial de duração ao vídeo original, mas o servidor ainda depende de CPU, RAM, espaço em disco, conexão e limites de execução do provedor. O yt-dlp suporta muitos sites, mas não garante qualquer URL. Vídeos privados, DRM, paywalls e links que exigem autenticação podem falhar. O suporte depende das regras e da disponibilidade de cada plataforma; o app não contorna proteção nem autenticação. Use somente vídeos que você tenha autorização para baixar e editar.
 
 A nota de potencial viral é heurística e não garante visualizações.
