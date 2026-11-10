@@ -359,7 +359,15 @@ def status(job):
 
 @app.get("/api/health")
 def health():
-    return {\n        "ok": True,\n        "app": "CortaViral AI",\n        "version": "1.3",\n        "sources": ["youtube", "tiktok", "direct_video_url", "gallery_upload"],\n        "clip_duration_seconds": {"minimum": MIN_CLIP_SECONDS, "maximum": MAX_CLIP_SECONDS},\n        "upload_endpoint": "/api/analyze-upload",\n        "url_endpoint": "/api/analyze"\n    }
+    return {
+        "ok": True,
+        "app": "CortaViral AI",
+        "version": "1.3",
+        "sources": ["youtube", "tiktok", "direct_video_url", "gallery_upload"],
+        "clip_duration_seconds": {"minimum": MIN_CLIP_SECONDS, "maximum": MAX_CLIP_SECONDS},
+        "upload_endpoint": "/api/analyze-upload",
+        "url_endpoint": "/api/analyze"
+    }
 
 app.mount("/outputs", StaticFiles(directory=str(OUT)), name="outputs")
 app.mount("/", StaticFiles(directory=str(BASE / "static"), html=True), name="static")
