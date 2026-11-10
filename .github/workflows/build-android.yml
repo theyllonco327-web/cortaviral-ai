@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Reassemble Android project archive
         run: |
-          cat .android-source/part-*.b64 | tr -d '\n' | base64 --decode > android-source.zip
+          cat .android-source/part-01.b64 .android-source/part-02.b64 .android-source/part-03.b64 .android-source/part-04.b64 .android-source/part-05.b64 .android-source/part-06.b64 .android-source/part-07.b64 .android-source/part-08a.b64 .android-source/part-08b.b64 .android-source/part-08c.b64 .android-source/part-09a.b64 .android-source/part-09b.b64 | base64 --decode > android-source.zip
           unzip -t android-source.zip
           mkdir -p android
           unzip -q android-source.zip -d android
