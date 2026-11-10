@@ -1,13 +1,15 @@
 # CortaViral AI
 
-Aplicativo web responsivo para analisar vídeos por URL, localizar trechos com sinais de potencial de retenção e exportar cortes verticais MP4 com legendas automáticas.
+Aplicativo web para analisar vídeos por URL, encontrar trechos com sinais de potencial de retenção e exportar cortes verticais MP4 com legendas automáticas.
 
-## Recursos do MVP
-- Importação de vídeos por URL com yt-dlp, quando o site permite acesso público.
-- Transcrição de fala com Faster-Whisper.
-- Seleção de trechos com baixa sobreposição.
+## Recursos da versão 1.1
+- Compatibilidade ampla com sites suportados pelo yt-dlp e links diretos de mídia.
+- Sem limite artificial de duração do vídeo original configurado no aplicativo.
+- Sem limite fixo de tamanho de arquivo configurado no yt-dlp.
+- Transcrição do conteúdo com Faster-Whisper.
+- Seleção de cortes entre **30 e 60 segundos**.
 - Ranking heurístico baseado em curiosidade, emoção, ritmo e densidade de fala.
-- Exportação em MP4 vertical 9:16 com legendas.
+- Exportação MP4 vertical 9:16 com legendas automáticas.
 - Acompanhamento do processamento e download dos cortes.
 
 ## Tecnologias
@@ -40,18 +42,20 @@ uvicorn app:app --host 127.0.0.1 --port 8000
 
 Abra http://127.0.0.1:8000 no navegador.
 
-## Publicar
-O repositório inclui um Dockerfile e render.yaml para iniciar uma publicação em serviço compatível com Docker, como Render. Revise o plano e os recursos antes de publicar. Processamento de vídeo exige CPU, memória e espaço em disco; instâncias gratuitas podem dormir, limitar execução e perder arquivos temporários.
+## Publicação
+O repositório inclui Dockerfile e render.yaml para serviços compatíveis com Docker, como Render. Um novo commit na branch principal pode iniciar um deploy automático se o serviço estiver configurado para auto-deploy.
+
+## Limites reais de processamento
+O aplicativo não define um limite fixo de duração do vídeo original nem de tamanho de download no yt-dlp. Isso **não significa processamento infinito**: CPU, RAM, disco, velocidade da conexão, tempo de execução do provedor e armazenamento temporário continuam sendo limites reais. Instâncias gratuitas podem dormir, reiniciar, ter pouco espaço e perder arquivos temporários. Vídeos muito longos podem demorar bastante ou exceder os recursos disponíveis.
+
+## Compatibilidade e direitos autorais
+O yt-dlp suporta muitos sites, mas nenhum programa consegue garantir download de qualquer URL. Links privados, DRM, vídeos que exigem autenticação, paywalls e plataformas que bloqueiam extração podem falhar. O aplicativo não tenta contornar DRM ou controles de acesso. Use apenas vídeos próprios, licenciados ou cujo download e edição você tenha autorização para fazer.
 
 ## Sobre a pontuação
-A nota é uma estimativa heurística baseada no conteúdo transcrito. Não é uma previsão confiável de visualizações e não garante viralização. O desempenho real depende do público, assunto, edição, distribuição e histórico do canal.
+A nota de 0 a 100 é uma estimativa heurística baseada na transcrição, em sinais de curiosidade e emoção e no ritmo da fala. Não é uma previsão confiável de visualizações e não garante viralização. Se a transcrição falhar, a versão atual seleciona janelas válidas por duração, mas não consegue avaliar semanticamente esses trechos.
 
-## Limitações
-- Alguns sites exigem login, bloqueiam downloads ou não permitem extração por URL.
-- Conteúdo privado, DRM e vídeos protegidos não são suportados.
-- O enquadramento vertical atual usa corte central; ainda não faz rastreamento inteligente de rosto.
-- A primeira versão não publica automaticamente nas redes sociais.
-- Os arquivos temporários ficam no servidor e precisam de política de limpeza/armazenamento para uso contínuo.
-
-## Segurança e direitos autorais
-Este MVP é para uso pessoal e testes. Antes de abrir ao público, implemente autenticação, limites de uso, fila de processamento, proteção adicional contra SSRF, limpeza automática e armazenamento persistente. Use apenas vídeos próprios, licenciados ou cujo uso você tenha autorização.
+## Melhorias futuras
+- Rastreamento de rosto e reenquadramento vertical inteligente.
+- Mais estilos de legenda e modelos de título/gancho.
+- Fila de tarefas, autenticação, histórico e armazenamento persistente.
+- Métricas reais dos vídeos publicados para calibrar o ranking.
