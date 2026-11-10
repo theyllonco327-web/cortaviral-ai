@@ -133,14 +133,12 @@ def candidates(segs, total):
     if not segs:
         # Sem transcrição, distribuir janelas pelo vídeo inteiro sem fingir
         # que existe uma análise semântica do conteúdo.
-        count = min(60, max(1, math.ceil(total / MAX_CLIP_SECONDS)))
-        if count == 1:
-            starts = [0]
-        else:
-            last_start = max(0, total - MAX_CLIP_SECONDS)
-            starts = [last_start * i / (count - 1) for i in range(count)]
-        for start in starts:
-            end = min(total, start + MAX_CLIP_SECONDS)
+        count = min(60, max(1, int(total // MIN_CLIP_SECONDS)))
+        step = total / count
+        for index in range(count):
+            start = index * step
+            window = min(MAX_CLIP_SECONDS, step)
+            end = min(total, start + window)
             if MIN_CLIP_SECONDS <= end - start <= MAX_CLIP_SECONDS:
                 found.append({
                     "start": start, "end": end, "text": "", "score": 50,
