@@ -51,7 +51,7 @@ def download(url, folder):
     # Não há limite artificial de duração nem de tamanho configurado aqui.
     # O tempo de download depende da origem, rede e recursos disponíveis no servidor.
     run([
-        "yt-dlp", "--no-playlist", "--no-warnings", "--no-progress",
+        "yt-dlp", "--js-runtimes", "deno", "--no-playlist", "--no-warnings", "--no-progress",
         "--socket-timeout", "30", "--retries", "5",
         "--fragment-retries", "5", "--extractor-retries", "3",
         "--concurrent-fragments", "4",
