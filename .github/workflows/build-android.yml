@@ -32,16 +32,21 @@ jobs:
         run: |
           python -m pip install fastapi pydantic python-multipart
           python -m py_compile app.py
-                    python - <<'PY'
+          python - <<'PY'
           import app
           h = app.health()
-          assert h["ok"] and h["version"] == "1.8" and h["whisper_model"] == "tiny"
+          assert h["ok"] and h["app"] == "CortaViral AI" and h["version"] == "2.0"
           assert h["clip_duration_seconds"] == {"minimum": 30, "maximum": 90}
+          assert h["upload_endpoint"] == "/api/analyze-upload"
+          assert h["url_endpoint"] == "/api/analyze"
+          assert app.AnalyzeRequest(url="https://example.com/video.mp4").subtitles is True
+          routes = {route.path for route in app.app.routes}
+          assert {"/api/health", "/api/analyze", "/api/analyze-upload", "/api/jobs/{job}"} <= routes
           for duration in (30, 31, 59, 90, 91, 100, 181, 5400):
               windows = app.candidates([], duration)
               assert windows, f"No windows for source duration {duration}"
               assert all(30 <= x["end"] - x["start"] <= 90 for x in windows)
-          print("Backend health and 30–90s clip-window tests OK")
+          print("API contract, upload routes, subtitles and 30–90s windows OK")
           PY
 
   build-apk:
