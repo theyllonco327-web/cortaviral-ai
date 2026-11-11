@@ -577,8 +577,10 @@ def health():
         "url_endpoint": "/api/analyze",
         "download_all_endpoint": "/api/jobs/{job_id}/download-all",
         "aspect_ratios": ["9:16", "1:1", "16:9"],
-        "features": ["broad_url_extractor_support", "generic_extractor_fallback", "gallery_upload", "optional_subtitles", "30_to_90_second_clips", "configurable_clip_duration", "speech_analysis", "visual_activity_analysis", "batch_download", "multiple_aspect_ratios", "local_device_history"],
-        "history_storage": "android_device_only"
+        "features": ["broad_url_extractor_support", "generic_extractor_fallback", "gallery_upload", "optional_subtitles", "30_to_90_second_clips", "configurable_clip_duration", "speech_analysis", "visual_activity_analysis", "batch_download", "multiple_aspect_ratios", "browser_local_history"],
+        "database": "none",
+        "history_storage": "browser_local_storage",
+        "job_state_storage": "temporary_json_files"
     }
 
 @app.get("/", include_in_schema=False)
