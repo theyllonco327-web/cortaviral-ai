@@ -41,6 +41,8 @@ streamlit run streamlit_app.py
 
 A interface alternativa permite importar um vídeo, baixar links públicos compatíveis com yt-dlp, selecionar cortes de 30 a 90 segundos, recortar para 9:16 ou 1:1, aproveitar legendas SRT disponíveis e baixar os cortes individualmente ou em ZIP. O teste automatizado gera um vídeo sintético e verifica o processamento MoviePy 2.x.
 
+No GitHub Codespaces, o contêiner também encaminha a porta 8501 e inicia o Studio automaticamente junto da API na porta 8000. Abra a aba **Ports** e selecione **CortaViral AI Studio (Streamlit)** para testar essa interface pelo navegador do celular.
+
 A instalação Streamlit fica em um arquivo de dependências separado para não aumentar a imagem Docker do servidor Android nem piorar seu tempo de inicialização no Render.
 
 ## Publicar e gerar APK
