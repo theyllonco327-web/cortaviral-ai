@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 BASE = Path(__file__).resolve().parent
 WORK, OUT = BASE / "work", BASE / "outputs"
 WORK.mkdir(exist_ok=True); OUT.mkdir(exist_ok=True)
-app = FastAPI(title="CortaViral AI", version="1.8")
+app = FastAPI(title="CortaViral AI", version="1.9")
 JOBS, LOCK = {}, threading.Lock()
 MODEL_LOCK = threading.Lock()
 WHISPER_INSTANCE = None
@@ -21,6 +21,7 @@ class AnalyzeRequest(BaseModel):
     url: str
     clips: int = Field(5, ge=1, le=10)
     aspect_ratio: str = Field("9:16", pattern=r"^(9:16|1:1|16:9)$")
+    subtitles: bool = True
 
 def update(job, **data):
     # O estado da tarefa fica apenas na memória enquanto o processamento ocorre.
@@ -272,7 +273,7 @@ def make_srt(segs, start, end, path):
         number += 1
     path.write_text("\n".join(lines), encoding="utf-8")
 
-def render(source, candidate, index, folder, segs, aspect_ratio="9:16"):
+def render(source, candidate, index, folder, segs, aspect_ratio="9:16", subtitles_enabled=True):
     start, end = candidate["start"], candidate["end"]
     duration = end - start
     if not MIN_CLIP_SECONDS <= duration <= MAX_CLIP_SECONDS:
@@ -283,7 +284,7 @@ def render(source, candidate, index, folder, segs, aspect_ratio="9:16"):
     dimensions = {"9:16": (1080, 1920), "1:1": (1080, 1080), "16:9": (1920, 1080)}
     width, height = dimensions.get(aspect_ratio, dimensions["9:16"])
     video_filter = f"scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height},setsar=1"
-    if srt.exists() and srt.stat().st_size:
+    if subtitles_enabled and srt.exists() and srt.stat().st_size:
         srt_path = str(srt).replace("\\", "/").replace(":", "\\:")
         video_filter += (
             f",subtitles='{srt_path}':force_style="
@@ -309,7 +310,7 @@ def render(source, candidate, index, folder, segs, aspect_ratio="9:16"):
         run(command, 1800)
     return output
 
-def process_source(job, clips, source, folder, aspect_ratio="9:16"):
+def process_source(job, clips, source, folder, aspect_ratio="9:16", subtitles_enabled=True):
     total = duration_of(source)
     if total < MIN_CLIP_SECONDS:
         raise RuntimeError("O vídeo de origem precisa ter pelo menos 30 segundos.")
@@ -344,7 +345,7 @@ def process_source(job, clips, source, folder, aspect_ratio="9:16"):
             progress=50 + int(45 * (index - 1) / max(1, len(chosen))),
             message=f"Renderizando corte {index} de {len(chosen)}…"
         )
-        file = render(source, candidate, index, folder, segs, aspect_ratio)
+        file = render(source, candidate, index, folder, segs, aspect_ratio, subtitles_enabled)
         text = candidate["text"]
         results.append({
             "number": index,
@@ -370,14 +371,14 @@ def process(job, req):
     try:
         update(job, status="processing", progress=3, message="Baixando vídeo da URL informada…")
         source = download(validate_url(req.url), folder)
-        process_source(job, req.clips, source, folder, req.aspect_ratio)
+        process_source(job, req.clips, source, folder, req.aspect_ratio, req.subtitles)
     except Exception as error:
         update(job, status="error", progress=0, message=str(error)[:1800])
 
-def process_local_upload(job, clips, source, folder, aspect_ratio="9:16"):
+def process_local_upload(job, clips, source, folder, aspect_ratio="9:16", subtitles_enabled=True):
     try:
         update(job, status="processing", progress=15, message="Vídeo recebido. Preparando análise…")
-        process_source(job, clips, source, folder, aspect_ratio)
+        process_source(job, clips, source, folder, aspect_ratio, subtitles_enabled)
     except Exception as error:
         update(job, status="error", progress=0, message=str(error)[:1800])
 
@@ -386,7 +387,8 @@ async def analyze_upload(
     background: BackgroundTasks,
     file: UploadFile = File(...),
     clips: int = Form(5),
-    aspect_ratio: str = Form("9:16")
+    aspect_ratio: str = Form("9:16"),
+    subtitles: bool = Form(True)
 ):
     if clips < 1 or clips > 10:
         raise HTTPException(400, "A quantidade de cortes precisa ficar entre 1 e 10.")
@@ -419,7 +421,7 @@ async def analyze_upload(
         destination.unlink(missing_ok=True)
         raise HTTPException(400, "O arquivo de vídeo está vazio.")
     update(job, status="queued", progress=5, message="Vídeo enviado. Entrando na fila…")
-    background.add_task(process_local_upload, job, clips, destination, folder, aspect_ratio)
+    background.add_task(process_local_upload, job, clips, destination, folder, aspect_ratio, subtitles)
     return {"job_id": job}
 
 @app.post("/api/analyze")
@@ -468,7 +470,9 @@ def health():
     return {
         "ok": True,
         "app": "CortaViral AI",
-        "version": "1.8",
+        "version": "1.9",
+        "api_contract": "cortaviral-v1",
+        "deployment_commit": os.getenv("RENDER_GIT_COMMIT", "unknown"),
         "whisper_model": os.getenv("WHISPER_MODEL", "tiny"),
         "sources": ["yt_dlp_supported_sites", "generic_web_pages", "direct_video_url", "gallery_upload"],
         "clip_duration_seconds": {"minimum": MIN_CLIP_SECONDS, "maximum": MAX_CLIP_SECONDS},
@@ -477,7 +481,7 @@ def health():
         "url_endpoint": "/api/analyze",
         "download_all_endpoint": "/api/jobs/{job_id}/download-all",
         "aspect_ratios": ["9:16", "1:1", "16:9"],
-        "features": ["broad_url_extractor_support", "generic_extractor_fallback", "gallery_upload", "automatic_subtitles", "30_to_90_second_clips", "batch_download", "multiple_aspect_ratios", "android_local_sqlite_history"],
+        "features": ["broad_url_extractor_support", "generic_extractor_fallback", "gallery_upload", "optional_subtitles", "30_to_90_second_clips", "batch_download", "multiple_aspect_ratios", "local_device_history"],
         "history_storage": "android_device_only"
     }
 
