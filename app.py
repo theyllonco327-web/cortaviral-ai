@@ -368,7 +368,7 @@ def process(job, req):
     folder = WORK / job
     folder.mkdir(parents=True, exist_ok=True)
     try:
-        update(job, status="processing", progress=3, message="Validando link do YouTube, TikTok ou outra fonte compatível…")
+        update(job, status="processing", progress=3, message="Baixando vídeo da URL informada…")
         source = download(validate_url(req.url), folder)
         process_source(job, req.clips, source, folder, req.aspect_ratio)
     except Exception as error:
@@ -470,7 +470,7 @@ def health():
         "app": "CortaViral AI",
         "version": "1.8",
         "whisper_model": os.getenv("WHISPER_MODEL", "tiny"),
-        "sources": ["youtube", "tiktok", "direct_video_url", "gallery_upload"],
+        "sources": ["yt_dlp_supported_sites", "generic_web_pages", "direct_video_url", "gallery_upload"],
         "clip_duration_seconds": {"minimum": MIN_CLIP_SECONDS, "maximum": MAX_CLIP_SECONDS},
         "url_download": "yt_dlp_auto_extractor_with_generic_fallback",
         "upload_endpoint": "/api/analyze-upload",
