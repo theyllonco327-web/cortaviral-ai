@@ -2,140 +2,173 @@
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#101923">
-  <title>CortaViral AI</title>
-  <link rel="stylesheet" href="/styles.css?v=2.1">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#08111f">
+  <meta name="description" content="Transforme vídeos longos em cortes prontos para Reels, TikTok e Shorts com o CortaViral AI.">
+  <title>CortaViral AI — Seu vídeo merece virar vários cortes</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/landing.css?v=1.0">
 </head>
 <body>
-  <div class="app-shell">
-    <header class="topbar">
-      <a class="brand" href="/" aria-label="CortaViral AI início">
-        <div class="brand-mark"><span>CV</span><i></i></div>
-        <div><strong>CortaViral <em>AI</em></strong><small>ESTÚDIO DE VÍDEOS</small></div>
-      </a>
-      <div class="top-actions">
-        <div class="connection" id="connection"><i></i><span>Conectando…</span></div>
-        <button class="settings-button" id="settingsButton" type="button" aria-label="Configurações">⚙</button>
-      </div>
-    </header>
-
-    <nav class="quick-nav" aria-label="Navegação principal">
-      <button class="nav-item active" type="button" data-scroll="editorPanel">＋ <span>Criar cortes</span></button>
-      <button class="nav-item" type="button" data-scroll="historySection">▤ <span>Biblioteca</span></button>
-      <button class="nav-item" type="button" data-scroll="diagnosticsSection">◉ <span>Conexão</span></button>
+  <div class="announcement"><span class="spark">✦</span> CORTAVIRAL AI <span class="announcement-sep">/</span> Seu estúdio de cortes com inteligência artificial</div>
+  <header class="site-header">
+    <a class="brand" href="/" aria-label="CortaViral AI início">
+      <span class="brand-icon"><i></i><i></i><i></i></span>
+      <span>CortaViral <b>AI</b></span>
+    </a>
+    <nav class="desktop-nav">
+      <a href="#como-funciona">Como funciona</a>
+      <a href="#recursos">Recursos</a>
+      <a href="#planos">Acesso</a>
+      <a href="#duvidas">Dúvidas</a>
     </nav>
-
-    <main>
-      <section class="welcome">
-        <div class="welcome-copy">
-          <div class="eyebrow"><span class="live-dot"></span> SEU ESTÚDIO CRIATIVO</div>
-          <h1>Um vídeo.<br><span>Vários momentos.</span></h1>
-          <p>Encontre os melhores trechos, transforme em cortes e prepare o conteúdo para publicar.</p>
-          <div class="feature-pills"><span>30–90 segundos</span><span>Legendas automáticas</span><span>Pronto para redes</span></div>
-        </div>
-        <div class="hero-art" aria-hidden="true">
-          <div class="hero-ring"></div><div class="hero-play">▶</div>
-          <div class="hero-wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-          <span class="hero-tag">AI CUT</span>
-        </div>
-      </section>
-
-      <section class="panel composer" id="editorPanel">
-        <div class="section-heading">
-          <div class="heading-icon">✂</div>
-          <div><h2>NOVO PROJETO</h2><p>Adicione um vídeo para começar a edição.</p></div>
-          <span class="step-label">ETAPA 01</span>
-        </div>
-
-        <label class="field-label" for="videoUrl">COLE A URL DO VÍDEO</label>
-        <div class="url-row">
-          <span class="url-icon">↗</span>
-          <input id="videoUrl" type="url" inputmode="url" placeholder="https://site.com/video…" autocomplete="url">
-          <button class="icon-button" id="pasteButton" type="button">Colar</button>
-        </div>
-        <div class="source-hint">Links públicos de plataformas, páginas com vídeo e endereços diretos podem funcionar conforme o acesso permitido pelo site.</div>
-
-        <div class="or-divider"><span>OU IMPORTE DO SEU CELULAR</span></div>
-        <label class="upload-button" for="videoFile" id="uploadDrop">
-          <span class="upload-icon">↑</span>
-          <span class="upload-copy"><strong>Escolher vídeo da galeria</strong><small id="fileName">Toque para selecionar MP4, MOV, MKV ou WEBM</small></span>
-          <span class="upload-arrow">›</span>
-        </label>
-        <input id="videoFile" type="file" accept="video/*,.mp4,.mov,.mkv,.webm,.avi,.m4v,.3gp" hidden>
-
-        <div class="settings-heading"><span>CONFIGURAÇÕES DO CORTE</span><span>ETAPA 02</span></div>
-        <div class="settings-grid">
-          <label class="setting"><span>Quantidade</span><select id="clipCount"><option value="1">1 corte</option><option value="3">3 cortes</option><option value="5" selected>5 cortes</option><option value="7">7 cortes</option><option value="10">10 cortes</option></select></label>
-          <label class="setting"><span>Formato do vídeo</span><select id="aspectRatio"><option value="9:16" selected>Vertical · Reels / Shorts</option><option value="1:1">Quadrado · Feed</option><option value="16:9">Horizontal · YouTube</option></select></label>
-          <label class="setting"><span>Duração mínima</span><select id="minDuration"><option value="30" selected>30 segundos</option><option value="45">45 segundos</option></select></label>
-          <label class="setting"><span>Duração máxima</span><select id="maxDuration"><option value="60">60 segundos</option><option value="75">75 segundos</option><option value="90" selected>90 segundos</option></select></label>
-        </div>
-        <label class="toggle-row" for="subtitles">
-          <span class="toggle-copy"><strong>Legendas automáticas</strong><small>Adicionar legendas ao vídeo quando a transcrição estiver disponível.</small></span>
-          <input id="subtitles" type="checkbox" checked><span class="toggle-ui"></span>
-        </label>
-        <div class="duration-banner"><span class="duration-icon">◷</span><span><strong id="durationSummary">Cortes entre 30 e 90 segundos</strong><small>Análise de fala, emoção e movimento visual.</small></span></div>
-
-        <button class="primary-button" id="analyzeButton" type="button"><span class="button-icon">✦</span> Analisar e criar cortes <b>→</b></button>
-        <div class="progress-panel" id="progressPanel" hidden>
-          <div class="progress-copy"><strong id="progressMessage">Preparando projeto…</strong><span id="progressPercent">0%</span></div>
-          <div class="progress-track"><span id="progressFill"></span></div>
-          <p id="progressHint">Mantenha o aplicativo aberto durante o processamento.</p>
-        </div>
-        <div class="error-panel" id="errorPanel" hidden role="alert">
-          <strong>Não foi possível concluir</strong><p id="errorMessage"></p>
-          <button type="button" id="retryButton">Tentar novamente</button>
-        </div>
-      </section>
-
-      <section class="diagnostics-section" id="diagnosticsSection">
-        <div class="section-heading section-heading-row">
-          <div><h2>STATUS DO SISTEMA</h2><p>Verificação real da API e da versão publicada.</p></div>
-          <button class="text-button" id="testServerButton" type="button">Testar agora ↻</button>
-        </div>
-        <div class="diagnostic-card">
-          <div class="diagnostic-top"><span class="diagnostic-led" id="diagnosticLed"></span><strong id="diagnosticTitle">Aguardando teste do servidor</strong><span class="version-chip" id="serverVersion">—</span></div>
-          <p id="diagnosticText">O aplicativo verificará se o servidor responde com a API correta, e não com uma página HTML.</p>
-          <div class="diagnostic-details"><span>ENDEREÇO</span><strong id="serverAddress">—</strong><span>BUILD PUBLICADO</span><strong id="serverCommit">—</strong></div>
-          <button class="diagnostic-link" id="openHealthButton" type="button">Copiar diagnóstico técnico</button>
-        </div>
-      </section>
-
-      <section class="history-section" id="historySection">
-        <div class="section-heading section-heading-row">
-          <div><h2>MINHA BIBLIOTECA</h2><p>Histórico salvo neste aparelho.</p></div>
-          <button class="text-button" id="clearHistory" type="button">Limpar histórico</button>
-        </div>
-        <div id="historyList" class="history-list"><div class="empty-state"><span>▤</span><strong>Sua biblioteca está vazia</strong><small>Seus projetos concluídos aparecerão aqui.</small></div></div>
-      </section>
-
-      <section class="results-section" id="resultsSection" hidden>
-        <div class="section-heading section-heading-row">
-          <div><h2>SEUS CORTES</h2><p id="resultsSummary">Momentos selecionados.</p></div>
-          <button class="secondary-button" id="downloadAll" type="button">↓ Baixar ZIP</button>
-        </div>
-        <div class="result-grid" id="resultGrid"></div>
-        <p class="disclaimer" id="scoreNote">A pontuação é uma estimativa de potencial de retenção.</p>
-      </section>
-    </main>
-
-    <div class="modal-backdrop" id="settingsModal" hidden>
-      <section class="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
-        <div class="modal-heading"><span>⚙</span><div><h2 id="settingsTitle">Configurações</h2><p>Conexão do CortaViral AI.</p></div></div>
-        <label for="serverUrl">URL DO SERVIDOR (NÃO É O LINK DO VÍDEO)</label>
-        <input id="serverUrl" type="url" inputmode="url" placeholder="https://cortaviral-ai.onrender.com">
-        <small class="modal-help">Use o endereço do Render ou do servidor ativo. Não cole aqui o link do YouTube ou TikTok.</small>
-        <div class="modal-actions">
-          <button class="secondary-button" id="closeSettings" type="button">Voltar</button>
-          <button class="primary-button" id="saveSettings" type="button">Salvar servidor</button>
-        </div>
-        <button class="reset-server" id="useDefaultServer" type="button">Usar endereço padrão do CortaViral AI</button>
-      </section>
+    <div class="header-actions">
+      <a class="login-link" href="/app/">Abrir estúdio</a>
+      <a class="button button-small button-primary" href="/app/">Começar agora <span>↗</span></a>
     </div>
+    <button class="mobile-menu" id="mobileMenu" aria-label="Abrir menu" aria-expanded="false">☰</button>
+  </header>
 
-    <footer><strong>CortaViral AI</strong> · Feito para transformar vídeos em conteúdo. Use somente vídeos que você tenha autorização para editar. Plataformas podem restringir downloads automáticos.</footer>
-  </div>
-  <script src="/app.js?v=2.1" defer></script>
+  <main>
+    <section class="hero">
+      <div class="hero-glow"></div>
+      <div class="hero-content">
+        <div class="eyebrow"><span class="pulse"></span> EDIÇÃO INTELIGENTE DE VÍDEOS</div>
+        <h1>Seu vídeo longo.<br><span>Vários momentos</span><br>que merecem destaque.</h1>
+        <p class="hero-copy">Cole um link ou envie um vídeo. O CortaViral AI analisa fala e movimento para encontrar trechos e transformar seu conteúdo em cortes prontos para suas redes.</p>
+        <form class="link-form" id="linkForm">
+          <span class="link-icon">↗</span>
+          <input id="heroUrl" type="url" placeholder="Cole o link do YouTube ou de um vídeo público" aria-label="Link do vídeo" required>
+          <button class="button button-primary" type="submit">Criar meus cortes <span>→</span></button>
+        </form>
+        <div class="hero-under"><span>✓</span> Sem cartão de crédito <i></i><span>✓</span> Cortes de 30 a 90 segundos <i></i><span>✓</span> Abra no celular ou computador</div>
+        <div class="hero-secondary"><a href="/app/" class="upload-link"><span class="upload-symbol">↑</span> Prefere enviar um arquivo? <b>Escolher na galeria</b></a></div>
+        <div class="hero-note" id="apiStatus"><span class="status-dot"></span> Verificando disponibilidade do estúdio…</div>
+      </div>
+
+      <div class="product-preview" aria-label="Prévia ilustrativa do estúdio CortaViral AI">
+        <div class="preview-top">
+          <div class="preview-brand"><span class="mini-mark">CV</span><span>CortaViral <b>AI</b></span></div>
+          <span class="preview-live"><i></i> ESTÚDIO</span>
+        </div>
+        <div class="preview-video">
+          <div class="video-orb orb-one"></div><div class="video-orb orb-two"></div>
+          <div class="video-center"><span>▶</span><small>SEU CONTEÚDO</small></div>
+          <div class="video-caption">O momento certo faz a diferença.</div>
+          <div class="video-time">00:42 <span>/ 03:18</span></div>
+        </div>
+        <div class="preview-analysis">
+          <div class="analysis-title"><span><i class="spark-small">✦</i> Análise inteligente</span><small>PRÉVIA VISUAL</small></div>
+          <div class="waveform" aria-hidden="true"><i style="--h:25px"></i><i style="--h:42px"></i><i style="--h:21px"></i><i style="--h:38px"></i><i style="--h:17px"></i><i style="--h:34px"></i><i style="--h:13px"></i><i style="--h:30px"></i><i style="--h:47px"></i><i style="--h:26px"></i><i style="--h:43px"></i><i style="--h:22px"></i><i style="--h:39px"></i><i style="--h:18px"></i><i style="--h:35px"></i><i style="--h:14px"></i><i style="--h:31px"></i><i style="--h:48px"></i><i style="--h:27px"></i><i style="--h:44px"></i><i style="--h:23px"></i><i style="--h:40px"></i><i style="--h:19px"></i><i style="--h:36px"></i><i style="--h:15px"></i><i style="--h:32px"></i><i style="--h:49px"></i><i style="--h:28px"></i><i style="--h:45px"></i><i style="--h:24px"></i><i style="--h:41px"></i><i style="--h:20px"></i><i style="--h:37px"></i><i style="--h:16px"></i><i style="--h:33px"></i><i style="--h:12px"></i><i style="--h:29px"></i><i style="--h:46px"></i><i style="--h:25px"></i><i style="--h:42px"></i><i style="--h:21px"></i><i style="--h:38px"></i><i style="--h:17px"></i><i style="--h:34px"></i><i style="--h:13px"></i><i style="--h:30px"></i><i style="--h:47px"></i><i style="--h:26px"></i><i style="--h:43px"></i><i style="--h:22px"></i><i style="--h:39px"></i><i style="--h:18px"></i></div>
+          <div class="timeline"><span></span><span></span><span></span></div>
+          <div class="preview-cuts">
+            <div><b>01</b><span><strong>Gancho inicial</strong><small>00:18 – 00:56</small></span><em>38s</em></div>
+            <div><b>02</b><span><strong>Momento de destaque</strong><small>01:12 – 02:02</small></span><em>50s</em></div>
+            <div><b>03</b><span><strong>Fechamento</strong><small>02:16 – 03:04</small></span><em>48s</em></div>
+          </div>
+          <div class="preview-foot"><span>FORMATO VERTICAL 9:16</span><span class="preview-ready">● EXEMPLO ILUSTRATIVO</span></div>
+        </div>
+        <div class="float-chip chip-top"><span>✦</span> IA trabalhando</div>
+        <div class="float-chip chip-bottom"><span>✓</span> Cortes organizados</div>
+      </div>
+    </section>
+
+    <section class="trust-strip">
+      <span>FEITO PARA QUEM CRIA CONTEÚDO</span>
+      <div><b>YOUTUBE</b><b>TIKTOK</b><b>INSTAGRAM</b><b>SHORTS</b><b>REELS</b></div>
+    </section>
+
+    <section class="section how-section" id="como-funciona">
+      <div class="section-heading">
+        <div class="eyebrow">SIMPLES DO INÍCIO AO FIM</div>
+        <h2>Do vídeo inteiro ao corte pronto.<br><span>Sem complicação.</span></h2>
+        <p>Você escolhe o conteúdo. A IA ajuda a encontrar os momentos. Você revisa e baixa.</p>
+      </div>
+      <div class="steps-grid">
+        <article class="step-card">
+          <div class="step-number">01 <span>ENTRADA</span></div>
+          <div class="step-art art-link"><div class="art-link-box">↗ <span>https://seu-video.com</span></div><div class="art-upload">↑</div></div>
+          <h3>Envie seu vídeo</h3><p>Cole um link compatível ou importe o arquivo diretamente da galeria do seu celular.</p>
+        </article>
+        <article class="step-card">
+          <div class="step-number">02 <span>INTELIGÊNCIA</span></div>
+          <div class="step-art art-ai"><div class="ai-core">✦</div><div class="ai-ring ring-a"></div><div class="ai-ring ring-b"></div><span class="ai-tag">ANALISANDO</span></div>
+          <h3>A IA encontra os momentos</h3><p>O sistema combina sinais de fala e movimento visual para classificar trechos interessantes.</p>
+        </article>
+        <article class="step-card">
+          <div class="step-number">03 <span>RESULTADO</span></div>
+          <div class="step-art art-results"><div class="result-mini"><b>01</b><span></span><em>42s</em></div><div class="result-mini"><b>02</b><span></span><em>58s</em></div><div class="result-mini"><b>03</b><span></span><em>35s</em></div></div>
+          <h3>Revise e baixe seus cortes</h3><p>Visualize os resultados, baixe individualmente ou reúna tudo em um arquivo ZIP.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="feature-section" id="recursos">
+      <div class="feature-copy">
+        <div class="eyebrow">SEU FLUXO DE CRIAÇÃO</div>
+        <h2>Mais conteúdo.<br><span>Menos trabalho repetitivo.</span></h2>
+        <p>Um espaço simples para transformar vídeos longos em peças curtas e organizar seus próximos posts.</p>
+        <a href="/app/" class="button button-primary">Conhecer o estúdio <span>→</span></a>
+      </div>
+      <div class="feature-list">
+        <article><div class="feature-icon">✂</div><div><h3>Cortes de 30 a 90 segundos</h3><p>Configure a duração mínima e máxima de cada trecho de acordo com o conteúdo.</p></div><span>01</span></article>
+        <article><div class="feature-icon">▤</div><div><h3>Legendas automáticas</h3><p>Gere legendas quando a transcrição estiver disponível e escolha se deseja incorporá-las ao vídeo.</p></div><span>02</span></article>
+        <article><div class="feature-icon">▣</div><div><h3>Formatos para cada rede</h3><p>Prepare vídeos na vertical 9:16, quadrada 1:1 ou horizontal 16:9.</p></div><span>03</span></article>
+        <article><div class="feature-icon">⇩</div><div><h3>Download simples</h3><p>Baixe seus cortes individualmente ou todos juntos em um ZIP.</p></div><span>04</span></article>
+      </div>
+    </section>
+
+    <section class="formats-section">
+      <div class="section-heading">
+        <div class="eyebrow">UM CONTEÚDO, VÁRIOS FORMATOS</div>
+        <h2>Pronto para o seu <span>próximo post.</span></h2>
+      </div>
+      <div class="format-grid">
+        <div class="format-card vertical"><div class="format-screen"><div class="format-person"></div><div class="format-text">UMA IDEIA<br>QUE PRENDE.</div><div class="format-play">▶</div></div><b>9:16 · Vertical</b><small>Reels, TikTok e Shorts</small></div>
+        <div class="format-card square"><div class="format-screen"><div class="format-person"></div><div class="format-text">CONTEÚDO<br>EM DESTAQUE.</div><div class="format-play">▶</div></div><b>1:1 · Quadrado</b><small>Publicações no feed</small></div>
+        <div class="format-card horizontal"><div class="format-screen"><div class="format-person"></div><div class="format-text">SEU VÍDEO.<br>NOVA HISTÓRIA.</div><div class="format-play">▶</div></div><b>16:9 · Horizontal</b><small>YouTube e telas amplas</small></div>
+      </div>
+    </section>
+
+    <section class="access-section" id="planos">
+      <div class="access-card">
+        <div class="access-glow"></div>
+        <div class="eyebrow">COMECE AGORA</div>
+        <h2>Seu próximo corte<br>pode começar <span>agora.</span></h2>
+        <p>Entre no estúdio, envie um vídeo e experimente o fluxo de criação do CortaViral AI.</p>
+        <div class="access-points"><span>✓ Sem cartão de crédito</span><span>✓ Link ou arquivo da galeria</span><span>✓ Histórico no seu dispositivo</span></div>
+        <a href="/app/" class="button button-primary button-large">Abrir CortaViral AI <span>↗</span></a>
+        <small>O uso depende da disponibilidade do servidor e das condições de acesso ao vídeo de origem.</small>
+      </div>
+    </section>
+
+    <section class="faq-section" id="duvidas">
+      <div class="section-heading">
+        <div class="eyebrow">AINDA TEM DÚVIDAS?</div>
+        <h2>Perguntas <span>frequentes.</span></h2>
+      </div>
+      <div class="faq-list">
+        <details><summary>Preciso saber editar vídeos? <span>＋</span></summary><p>Não. O CortaViral AI automatiza a seleção inicial dos trechos e a geração dos cortes. Você pode revisar os resultados antes de baixar.</p></details>
+        <details><summary>Posso enviar um vídeo que está no meu celular? <span>＋</span></summary><p>Sim. Abra o estúdio e use a opção de importar vídeo da galeria. Também é possível enviar um link público compatível.</p></details>
+        <details><summary>Qual é a duração dos cortes? <span>＋</span></summary><p>Você pode configurar a duração mínima e máxima dentro da faixa de 30 a 90 segundos.</p></details>
+        <details><summary>O sistema funciona com qualquer link? <span>＋</span></summary><p>Não há garantia para todos os sites. O link precisa estar acessível e ser compatível com os métodos de extração. Alguns serviços bloqueiam downloads automáticos; nesses casos, use um arquivo da galeria que você tenha autorização para editar.</p></details>
+        <details><summary>Meus vídeos ficam salvos na nuvem? <span>＋</span></summary><p>O histórico da interface fica salvo localmente no dispositivo. Os vídeos enviados passam pelo servidor para processamento e os arquivos temporários podem ser removidos conforme a disponibilidade do ambiente.</p></details>
+      </div>
+    </section>
+
+    <section class="final-cta">
+      <div class="final-icon">✦</div><h2>Transforme seu próximo vídeo.</h2><p>Abra o estúdio e comece a criar.</p><a href="/app/" class="button button-primary">Começar agora <span>→</span></a>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <a class="brand" href="/"><span class="brand-icon"><i></i><i></i><i></i></span><span>CortaViral <b>AI</b></span></a>
+    <p>Feito para transformar vídeos em conteúdo.</p>
+    <a href="/app/">Entrar no estúdio ↗</a>
+    <small>© 2026 CortaViral AI. Use somente vídeos que você tenha autorização para editar.</small>
+  </footer>
+  <script src="/landing.js?v=1.0" defer></script>
 </body>
 </html>
