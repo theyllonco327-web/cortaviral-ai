@@ -297,7 +297,7 @@ def render(source, candidate, index, folder, segs, aspect_ratio="9:16"):
     except Exception:
         # Se o filtro de legendas falhar, ainda entrega o corte vertical.
         command[command.index("-vf") + 1] = (
-            "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1"
+            f"scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height},setsar=1"
         )
         run(command, 1800)
     return output
