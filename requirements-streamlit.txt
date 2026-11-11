@@ -1,6 +1,0 @@
-streamlit==1.45.1
-yt-dlp[default]>=2025.3.31
-moviepy==2.2.1
-opencv-python-headless==4.11.0.86
-numpy>=1.26.4,<2.3
-pillow>=10.0.0
