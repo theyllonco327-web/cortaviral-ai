@@ -2,6 +2,12 @@
 
 Aplicativo Android híbrido com **Java + HTML + CSS + JavaScript**.
 
+## Site e aplicativo
+
+- A página pública de apresentação fica em `/`, com formulário de link, explicação dos recursos, fluxo de uso e perguntas frequentes.
+- O estúdio de edição continua disponível em `/app/`; os links enviados pela página inicial são encaminhados para o campo de URL do editor.
+- O APK Android abre diretamente em `/app/`, preservando a experiência de aplicativo.
+
 ## Arquitetura atual
 
 - **Java Android (WebMainActivity)**: abre o aplicativo em WebView, permite escolher vídeos da galeria e recebe downloads.
