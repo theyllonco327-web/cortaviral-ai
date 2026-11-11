@@ -366,5 +366,190 @@ source = source.replace(
     "    private Button aspectRatioButton;\n    private String currentJobId = \"\";\n",
     1
 )
+
+# v1.7: keep analysis history in a private SQLite database on the Android phone.
+source = source.replace(
+    '    private String currentJobId = "";\n',
+    '''    private String currentJobId = "";
+    private LocalHistoryDb localHistoryDb;
+    private LinearLayout historyBox;
+    private String currentSourceLabel = "Vídeo";
+''',
+    1
+)
+source = source.replace(
+    "        preferences = getSharedPreferences(PREFS, MODE_PRIVATE);\n",
+    "        preferences = getSharedPreferences(PREFS, MODE_PRIVATE);\n        localHistoryDb = new LocalHistoryDb(this);\n",
+    1
+)
+source = source.replace(
+    "        page.addView(resultsBox, resultsParams);\n",
+    """        page.addView(resultsBox, resultsParams);
+
+        historyBox = new LinearLayout(this);
+        historyBox.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams historyParams = new LinearLayout.LayoutParams(-1, -2);
+        historyParams.topMargin = dp(18);
+        page.addView(historyBox, historyParams);
+        renderLocalHistory();
+""",
+    1
+)
+source = source.replace(
+    '        String url = urlInput.getText().toString().trim();\n',
+    '        String url = urlInput.getText().toString().trim();\n        currentSourceLabel = url;\n',
+    1
+)
+source = source.replace(
+    '                String filename = displayName(uri);\n',
+    '                String filename = displayName(uri);\n                currentSourceLabel = filename;\n',
+    1
+)
+source = source.replace(
+    "    private void showResults(JSONObject job, String jobId) {\n",
+    "    private void showResults(JSONObject job, String jobId) {\n        saveAnalysisOnPhone(jobId, job);\n",
+    1
+)
+source = source.replace(
+    "    private void hideKeyboard() {\n",
+    """    private void saveAnalysisOnPhone(String jobId, JSONObject job) {
+        try {
+            JSONArray items = job.optJSONArray("results");
+            int count = items == null ? 0 : items.length();
+            localHistoryDb.save(
+                    jobId,
+                    currentSourceLabel == null ? "Vídeo" : currentSourceLabel,
+                    count,
+                    job.optString("score_note", ""),
+                    items == null ? "[]" : items.toString()
+            );
+            renderLocalHistory();
+        } catch (Exception error) {
+            toast("A análise foi concluída, mas não foi possível salvar o histórico no celular.");
+        }
+    }
+
+    private void renderLocalHistory() {
+        if (historyBox == null || localHistoryDb == null) return;
+        historyBox.removeAllViews();
+        TextView heading = text("HISTÓRICO SALVO NESTE CELULAR", 13, WHITE, true);
+        historyBox.addView(heading);
+        TextView subtitle = text("Suas análises ficam no aparelho, sem banco de dados externo.", 10, MUTED, false);
+        LinearLayout.LayoutParams subtitleParams = new LinearLayout.LayoutParams(-1, -2);
+        subtitleParams.topMargin = dp(4);
+        historyBox.addView(subtitle, subtitleParams);
+
+        Cursor cursor = localHistoryDb.getRecent();
+        if (cursor == null) return;
+        try {
+            if (cursor.getCount() == 0) {
+                TextView empty = text("Nenhuma análise salva ainda. Quando um vídeo for processado, ele aparecerá aqui.", 11, MUTED, false);
+                LinearLayout.LayoutParams emptyParams = new LinearLayout.LayoutParams(-1, -2);
+                emptyParams.topMargin = dp(10);
+                historyBox.addView(empty, emptyParams);
+                return;
+            }
+            Button clearButton = button("LIMPAR HISTÓRICO", false);
+            LinearLayout.LayoutParams clearParams = new LinearLayout.LayoutParams(-1, dp(42));
+            clearParams.topMargin = dp(10);
+            historyBox.addView(clearButton, clearParams);
+            clearButton.setOnClickListener(v -> new AlertDialog.Builder(this)
+                    .setTitle("Apagar histórico deste celular?")
+                    .setMessage("Isso apaga apenas os registros locais do CortaViral AI. Os vídeos já baixados na pasta Downloads não serão apagados.")
+                    .setNegativeButton("CANCELAR", null)
+                    .setPositiveButton("APAGAR", (dialog, which) -> {
+                        localHistoryDb.clear();
+                        renderLocalHistory();
+                        toast("Histórico local apagado.");
+                    }).show());
+
+            while (cursor.moveToNext()) {
+                String title = cursor.getString(cursor.getColumnIndexOrThrow("title"));
+                long createdAt = cursor.getLong(cursor.getColumnIndexOrThrow("created_at"));
+                int count = cursor.getInt(cursor.getColumnIndexOrThrow("result_count"));
+                String date = new java.text.SimpleDateFormat(
+                        "dd/MM/yyyy 'às' HH:mm", java.util.Locale.getDefault()
+                ).format(new java.util.Date(createdAt));
+                LinearLayout item = card();
+                LinearLayout.LayoutParams itemParams = new LinearLayout.LayoutParams(-1, -2);
+                itemParams.topMargin = dp(9);
+                historyBox.addView(item, itemParams);
+                TextView itemTitle = text(title == null || title.trim().isEmpty() ? "Vídeo analisado" : title, 12, WHITE, true);
+                item.addView(itemTitle);
+                TextView metadata = text(count + " corte(s)  •  " + date, 10, MUTED, false);
+                LinearLayout.LayoutParams metadataParams = new LinearLayout.LayoutParams(-1, -2);
+                metadataParams.topMargin = dp(5);
+                item.addView(metadata, metadataParams);
+            }
+        } finally {
+            cursor.close();
+        }
+    }
+
+    private void hideKeyboard() {
+""",
+    1
+)
+
+# Generate the SQLite helper as part of every Android build.
+Path("android/app/src/main/java/com/cortaviral/ai/LocalHistoryDb.java").write_text("""package com.cortaviral.ai;
+
+import android.content.ContentValues;
+import android.content.Context;
+import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
+import android.database.sqlite.SQLiteOpenHelper;
+
+public final class LocalHistoryDb extends SQLiteOpenHelper {
+    private static final String DB_NAME = "cortaviral_phone.db";
+    private static final int DB_VERSION = 1;
+    private static final String TABLE = "analysis_history";
+
+    public LocalHistoryDb(Context context) {
+        super(context, DB_NAME, null, DB_VERSION);
+    }
+
+    @Override
+    public void onCreate(SQLiteDatabase db) {
+        db.execSQL("CREATE TABLE " + TABLE + " (" +
+                "job_id TEXT PRIMARY KEY NOT NULL, " +
+                "title TEXT NOT NULL, " +
+                "created_at INTEGER NOT NULL, " +
+                "result_count INTEGER NOT NULL, " +
+                "score_note TEXT, " +
+                "results_json TEXT NOT NULL)");
+    }
+
+    @Override
+    public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
+        // Preserve local history when the schema is extended in a later release.
+    }
+
+    public void save(String jobId, String title, int resultCount, String scoreNote, String resultsJson) {
+        if (jobId == null || jobId.trim().isEmpty()) return;
+        ContentValues values = new ContentValues();
+        values.put("job_id", jobId);
+        values.put("title", title == null ? "Vídeo" : title);
+        values.put("created_at", System.currentTimeMillis());
+        values.put("result_count", resultCount);
+        values.put("score_note", scoreNote == null ? "" : scoreNote);
+        values.put("results_json", resultsJson == null ? "[]" : resultsJson);
+        getWritableDatabase().insertWithOnConflict(TABLE, null, values, SQLiteDatabase.CONFLICT_REPLACE);
+    }
+
+    public Cursor getRecent() {
+        return getReadableDatabase().query(
+                TABLE,
+                new String[]{"job_id", "title", "created_at", "result_count", "score_note", "results_json"},
+                null, null, null, null, "created_at DESC", "50"
+        );
+    }
+
+    public void clear() {
+        getWritableDatabase().delete(TABLE, null, null);
+    }
+}
+""", encoding="utf-8")
+
 path.write_text(source, encoding="utf-8")
 print("Android: interface preservada; polling limitado, timeout e erro detalhado aplicados.")
