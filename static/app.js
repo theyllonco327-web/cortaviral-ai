@@ -188,8 +188,12 @@ $("saveSettings").addEventListener("click", () => {
     if (parsed.protocol !== "https:" || !parsed.hostname) throw new Error("Use um endereço HTTPS válido.");
     const next = parsed.origin;
     localStorage.setItem("cortaviral_server_url", next);
-    API_BASE = next;
     $("settingsModal").hidden = true;
+    if (next !== location.origin) {
+      location.href = next + "/";
+      return;
+    }
+    API_BASE = next;
     checkServer();
   } catch (error) {
     alert(error.message || "Endereço inválido. Use o endereço HTTPS do servidor.");
