@@ -551,5 +551,189 @@ public final class LocalHistoryDb extends SQLiteOpenHelper {
 }
 """, encoding="utf-8")
 
+
+# Build the Android shell in Java and render the responsive HTML/CSS/JS app in WebView.
+web_java = r"""package com.cortaviral.ai;
+
+import android.app.Activity;
+import android.app.DownloadManager;
+import android.content.Context;
+import android.content.Intent;
+import android.net.Uri;
+import android.os.Bundle;
+import android.os.Environment;
+import android.webkit.DownloadListener;
+import android.webkit.ValueCallback;
+import android.webkit.WebChromeClient;
+import android.webkit.WebResourceRequest;
+import android.webkit.WebSettings;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
+import android.widget.Toast;
+
+public final class WebMainActivity extends Activity {
+    private static final int PICK_VIDEO = 3301;
+    private static final String DEFAULT_SERVER = "https://cortaviral-ai.onrender.com/";
+    private WebView webView;
+    private ValueCallback<Uri[]> uploadCallback;
+    private String serverHost = "cortaviral-ai.onrender.com";
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        getWindow().setStatusBarColor(android.graphics.Color.rgb(13, 23, 36));
+        getWindow().setNavigationBarColor(android.graphics.Color.rgb(13, 23, 36));
+
+        String saved = getSharedPreferences("cortaviral_settings", MODE_PRIVATE)
+                .getString("server_url", DEFAULT_SERVER);
+        String startUrl = normalizeServer(saved);
+        Uri startUri = Uri.parse(startUrl);
+        if (startUri.getHost() != null) serverHost = startUri.getHost();
+
+        webView = new WebView(this);
+        WebSettings settings = webView.getSettings();
+        settings.setJavaScriptEnabled(true);
+        settings.setDomStorageEnabled(true);
+        settings.setDatabaseEnabled(true);
+        settings.setAllowFileAccess(false);
+        settings.setAllowContentAccess(true);
+        settings.setJavaScriptCanOpenWindowsAutomatically(false);
+        settings.setSupportMultipleWindows(false);
+        settings.setMediaPlaybackRequiresUserGesture(true);
+        settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
+        webView.setBackgroundColor(android.graphics.Color.rgb(13, 23, 36));
+
+        webView.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public boolean onShowFileChooser(
+                    WebView view,
+                    ValueCallback<Uri[]> filePathCallback,
+                    FileChooserParams fileChooserParams) {
+                if (uploadCallback != null) uploadCallback.onReceiveValue(null);
+                uploadCallback = filePathCallback;
+                Intent picker = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                picker.addCategory(Intent.CATEGORY_OPENABLE);
+                picker.setType("video/*");
+                try {
+                    startActivityForResult(picker, PICK_VIDEO);
+                    return true;
+                } catch (Exception error) {
+                    uploadCallback = null;
+                    Toast.makeText(WebMainActivity.this,
+                            "Não foi possível abrir a galeria de vídeos.", Toast.LENGTH_LONG).show();
+                    return false;
+                }
+            }
+        });
+
+        webView.setWebViewClient(new WebViewClient() {
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                Uri uri = request.getUrl();
+                if ("https".equalsIgnoreCase(uri.getScheme())
+                        && serverHost.equalsIgnoreCase(uri.getHost())) {
+                    return false;
+                }
+                try {
+                    startActivity(new Intent(Intent.ACTION_VIEW, uri));
+                } catch (Exception ignored) {
+                    Toast.makeText(WebMainActivity.this,
+                            "Não foi possível abrir este endereço.", Toast.LENGTH_SHORT).show();
+                }
+                return true;
+            }
+        });
+
+        webView.setDownloadListener(new DownloadListener() {
+            @Override
+            public void onDownloadStart(String url, String userAgent,
+                                        String contentDisposition, String mimeType,
+                                        long contentLength) {
+                downloadFile(url, userAgent, contentDisposition, mimeType);
+            }
+        });
+
+        setContentView(webView);
+        webView.loadUrl(startUrl);
+    }
+
+    private String normalizeServer(String value) {
+        if (value == null || value.trim().isEmpty()) return DEFAULT_SERVER;
+        String candidate = value.trim();
+        if (!candidate.startsWith("https://")) candidate = "https://" + candidate;
+        while (candidate.endsWith("/")) candidate = candidate.substring(0, candidate.length() - 1);
+        return candidate + "/";
+    }
+
+    private void downloadFile(String url, String userAgent,
+                              String contentDisposition, String mimeType) {
+        try {
+            DownloadManager manager = (DownloadManager) getSystemService(Context.DOWNLOAD_SERVICE);
+            DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
+            request.setTitle("CortaViral AI");
+            request.setDescription("Baixando seu corte de vídeo");
+            request.setMimeType(mimeType);
+            request.setNotificationVisibility(
+                    DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+            request.setAllowedOverMetered(true);
+            request.setAllowedOverRoaming(false);
+            String filename = android.webkit.URLUtil.guessFileName(
+                    url, contentDisposition, mimeType);
+            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, filename);
+            manager.enqueue(request);
+            Toast.makeText(this, "Download iniciado. Veja a pasta Downloads.", Toast.LENGTH_LONG).show();
+        } catch (Exception error) {
+            Toast.makeText(this, "Não foi possível iniciar o download.", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == PICK_VIDEO && uploadCallback != null) {
+            Uri[] selected = null;
+            if (resultCode == RESULT_OK && data != null && data.getData() != null) {
+                selected = new Uri[]{data.getData()};
+            }
+            uploadCallback.onReceiveValue(selected);
+            uploadCallback = null;
+        }
+    }
+
+    @Override
+    @SuppressWarnings("deprecation")
+    public void onBackPressed() {
+        if (webView != null && webView.canGoBack()) webView.goBack();
+        else super.onBackPressed();
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (uploadCallback != null) {
+            uploadCallback.onReceiveValue(null);
+            uploadCallback = null;
+        }
+        if (webView != null) {
+            webView.stopLoading();
+            webView.destroy();
+            webView = null;
+        }
+        super.onDestroy();
+    }
+}
+"""
+Path("android/app/src/main/java/com/cortaviral/ai/WebMainActivity.java").write_text(
+    web_java, encoding="utf-8"
+)
+manifest_path = Path("android/app/src/main/AndroidManifest.xml")
+manifest = manifest_path.read_text(encoding="utf-8")
+if 'android:name=".MainActivity"' not in manifest:
+    raise SystemExit("Atividade principal não encontrada no Manifest.")
+manifest = manifest.replace(
+    'android:name=".MainActivity"',
+    'android:name=".WebMainActivity"',
+    1
+)
+manifest_path.write_text(manifest, encoding="utf-8")
 path.write_text(source, encoding="utf-8")
 print("Android: interface preservada; polling limitado, timeout e erro detalhado aplicados.")
