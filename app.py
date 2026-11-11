@@ -1,4 +1,4 @@
-import os, re, uuid, socket, ipaddress, subprocess, threading, math, json, zipfile
+import os, re, uuid, socket, ipaddress, subprocess, threading, math, zipfile
 from pathlib import Path
 from urllib.parse import urlparse
 from fastapi import FastAPI, BackgroundTasks, HTTPException, UploadFile, File, Form
@@ -23,17 +23,11 @@ class AnalyzeRequest(BaseModel):
     aspect_ratio: str = Field("9:16", pattern=r"^(9:16|1:1|16:9)$")
 
 def update(job, **data):
+    # O estado da tarefa fica apenas na memória enquanto o processamento ocorre.
+    # O histórico permanente das análises é guardado no SQLite privado do Android.
     with LOCK:
         state = JOBS.setdefault(job, {})
         state.update(data)
-        snapshot = dict(state)
-    # Persiste cada etapa para que o app receba um erro explícito se o
-    # processo do servidor reiniciar durante uma análise.
-    folder = WORK / job
-    folder.mkdir(parents=True, exist_ok=True)
-    temporary = folder / "job.json.tmp"
-    temporary.write_text(json.dumps(snapshot, ensure_ascii=False), encoding="utf-8")
-    temporary.replace(folder / "job.json")
 
 def run(cmd, timeout=900):
     p = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
@@ -431,13 +425,7 @@ def download_all(job: str):
         current = JOBS.get(job)
         state = dict(current) if current is not None else None
     if state is None:
-        state_file = WORK / job / "job.json"
-        if not state_file.is_file():
-            raise HTTPException(404, "Análise não encontrada ou tarefa expirada.")
-        try:
-            state = json.loads(state_file.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            raise HTTPException(500, "Não foi possível recuperar os resultados.")
+        raise HTTPException(404, "Análise não está mais disponível no servidor. O histórico salvo no celular continua preservado.")
     if state.get("status") != "completed":
         raise HTTPException(409, "Os cortes ainda não estão prontos para baixar.")
     items = state.get("results", [])
@@ -458,33 +446,16 @@ def download_all(job: str):
 def status(job):
     with LOCK:
         current = JOBS.get(job)
-        if current is not None:
-            return dict(current)
-    state_file = WORK / job / "job.json"
-    if not state_file.is_file():
-        raise HTTPException(404, "Análise não encontrada ou tarefa expirada.")
-    try:
-        saved = json.loads(state_file.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        raise HTTPException(500, "Não foi possível recuperar o estado desta análise.")
-    if saved.get("status") in ("queued", "processing"):
-        saved.update({
-            "status": "error",
-            "progress": 100,
-            "message": (
-                "O servidor foi reiniciado durante esta análise. "
-                "Envie o vídeo novamente; o aplicativo não continuará consultando uma tarefa perdida."
-            ),
-        })
-        state_file.write_text(json.dumps(saved, ensure_ascii=False), encoding="utf-8")
-    return saved
+        if current is None:
+            raise HTTPException(404, "Análise não está mais ativa no servidor. O histórico concluído permanece salvo no celular.")
+        return dict(current)
 
 @app.get("/api/health")
 def health():
     return {
         "ok": True,
         "app": "CortaViral AI",
-        "version": "1.6",
+        "version": "1.7",
         "whisper_model": os.getenv("WHISPER_MODEL", "tiny"),
         "sources": ["youtube", "tiktok", "direct_video_url", "gallery_upload"],
         "clip_duration_seconds": {"minimum": MIN_CLIP_SECONDS, "maximum": MAX_CLIP_SECONDS},
@@ -492,7 +463,8 @@ def health():
         "url_endpoint": "/api/analyze",
         "download_all_endpoint": "/api/jobs/{job_id}/download-all",
         "aspect_ratios": ["9:16", "1:1", "16:9"],
-        "features": ["url_analysis", "gallery_upload", "automatic_subtitles", "batch_download", "multiple_aspect_ratios"]
+        "features": ["url_analysis", "gallery_upload", "automatic_subtitles", "batch_download", "multiple_aspect_ratios", "android_local_sqlite_history"],
+        "history_storage": "android_device_only"
     }
 
 app.mount("/outputs", StaticFiles(directory=str(OUT)), name="outputs")
