@@ -660,9 +660,24 @@ public final class WebMainActivity extends Activity {
     private String normalizeServer(String value) {
         if (value == null || value.trim().isEmpty()) return DEFAULT_SERVER;
         String candidate = value.trim();
-        if (!candidate.startsWith("https://")) candidate = "https://" + candidate;
-        while (candidate.endsWith("/")) candidate = candidate.substring(0, candidate.length() - 1);
-        return candidate + "/";
+        if (!candidate.contains("://")) candidate = "https://" + candidate;
+        Uri uri = Uri.parse(candidate);
+        String host = uri.getHost();
+        if (!"https".equalsIgnoreCase(uri.getScheme()) || host == null || isVideoPlatformHost(host)) {
+            Toast.makeText(this, "Endereço antigo ou inválido detectado. Usando o servidor oficial do CortaViral AI.", Toast.LENGTH_LONG).show();
+            return DEFAULT_SERVER;
+        }
+        String authority = host + (uri.getPort() > 0 ? ":" + uri.getPort() : "");
+        return "https://" + authority + "/";
+    }
+
+    private boolean isVideoPlatformHost(String host) {
+        String value = host.toLowerCase(java.util.Locale.ROOT);
+        String[] domains = {"youtube.com", "youtu.be", "tiktok.com", "instagram.com", "facebook.com", "x.com", "twitter.com"};
+        for (String domain : domains) {
+            if (value.equals(domain) || value.endsWith("." + domain)) return true;
+        }
+        return false;
     }
 
     private void downloadFile(String url, String userAgent,
