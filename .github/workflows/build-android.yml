@@ -65,7 +65,12 @@ jobs:
           samples = [{"time": 4.0, "score": 0.08}, {"time": 8.0, "score": 0.12}]
           assert app.visual_window_score(samples, 0, 10) > 0
           routes = {route.path for route in app.app.routes}
-          assert {"/api/health", "/api/analyze", "/api/analyze-upload", "/api/jobs/{job}"} <= routes
+          assert {"/", "/app", "/app/", "/api/health", "/api/analyze", "/api/analyze-upload", "/api/jobs/{job}"} <= routes
+          assert Path("static/index.html").is_file() and Path("static/app.html").is_file()
+          landing = Path("static/index.html").read_text(encoding="utf-8")
+          editor = Path("static/app.html").read_text(encoding="utf-8")
+          assert "CortaViral AI" in landing and 'id="linkForm"' in landing
+          assert 'id="analyzeButton"' in editor and '/app.js' in editor
           for duration in (30, 31, 59, 90, 91, 100, 181, 5400):
               windows = app.candidates([], duration)
               assert windows, f"No windows for source duration {duration}"
