@@ -3,6 +3,8 @@ const HISTORY_KEY = "cortaviral_local_history_v2";
 const DEFAULT_SERVER = "https://cortaviral-ai.onrender.com";
 let activeJob = "";
 let activeSource = "";
+let currentResults = [];
+let currentJobId = "";
 let pollTimer = null;
 let serverHealth = null;
 let serverOK = false;
@@ -274,14 +276,38 @@ function makeClipCard(clip) {
   card.append(top,transcript,tags,video,actions);
   return card;
 }
+function drawVisibleResults() {
+  const host = $("resultGrid");
+  if (!host) return;
+  const query = ($("clipSearch")?.value || "").trim().toLocaleLowerCase("pt-BR");
+  const sort = $("clipSort")?.value || "recent";
+  let list = currentResults.filter(clip => {
+    const searchable = [clip.hook, clip.text, ...(clip.reasons || [])].join(" ").toLocaleLowerCase("pt-BR");
+    return !query || searchable.includes(query);
+  });
+  if (sort === "score") list.sort((a,b) => (Number(b.score)||0) - (Number(a.score)||0));
+  if (sort === "duration") list.sort((a,b) => (Number(b.duration)||0) - (Number(a.duration)||0));
+  host.replaceChildren();
+  if (!list.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty-library";
+    empty.innerHTML = query
+      ? "<strong>Nenhum clipe encontrado</strong><p>Tente buscar por outro termo.</p>"
+      : '<div class="empty-library-art"><span>✂</span><i></i><i></i><i></i></div><strong>Seus próximos clipes aparecem aqui</strong><p>Cole um link ou envie um vídeo e clique em <b>Gerar cortes agora</b>.</p>';
+    host.appendChild(empty);
+    return;
+  }
+  list.forEach(clip => host.appendChild(makeClipCard(clip)));
+}
 function renderResults(job, jobId, scroll) {
   const results = job.results || [];
+  currentResults = results.slice();
+  currentJobId = jobId || "";
   $("resultsSection").hidden = false;
-  $("resultsSummary").textContent = results.length + " corte(s) · " + (job.source_duration ? formatTime(job.source_duration) + " de vídeo original" : "análise concluída");
+  $("resultsSummary").textContent = results.length + " clipe(s) · " + (job.source_duration ? formatTime(job.source_duration) + " de vídeo original" : "análise concluída");
   $("scoreNote").textContent = job.score_note || job.transcript_note || "A pontuação é uma estimativa, não uma promessa de viralização.";
-  const host = $("resultGrid");
-  host.replaceChildren();
-  results.forEach(clip => host.appendChild(makeClipCard(clip)));
+  drawVisibleResults();
+  $("downloadAll").disabled = !jobId || !results.length;
   $("downloadAll").onclick = () => {
     if (!jobId) return;
     const link = document.createElement("a");
@@ -481,10 +507,13 @@ $("clearHistory").addEventListener("click", () => {
 $("videoUrl").addEventListener("keydown", event => { if (event.key === "Enter") startAnalysis(); });
 $("testServerButton").addEventListener("click", () => checkServer(false));
 $("openHealthButton").addEventListener("click", copyCurrentDiagnostics);
-$("settingsButton").addEventListener("click", () => {
+function openSettings() {
   $("serverUrl").value = API_BASE;
   $("settingsModal").hidden = false;
-});
+}
+$("settingsButton").addEventListener("click", openSettings);
+$("topSettings").addEventListener("click", openSettings);
+$("closeSettings").addEventListener("click", () => { $("settingsModal").hidden = true; });
 $("closeSettings").addEventListener("click", () => { $("settingsModal").hidden = true; });
 $("settingsModal").addEventListener("click", event => {
   if (event.target === $("settingsModal")) $("settingsModal").hidden = true;
@@ -516,8 +545,32 @@ $("useDefaultServer").addEventListener("click", () => {
 document.querySelectorAll("[data-scroll]").forEach(button => button.addEventListener("click", () => {
   const target = $(button.dataset.scroll);
   if (target) target.scrollIntoView({behavior:"smooth",block:"start"});
-  document.querySelectorAll(".nav-item").forEach(item => item.classList.toggle("active", item === button));
+  document.querySelectorAll(".side-link").forEach(item => item.classList.toggle("active", item === button));
+  $("sidebar")?.classList.remove("open");
+  $("mobileBackdrop")?.classList.remove("visible");
 }));
+document.querySelectorAll("[data-feature]").forEach(button => button.addEventListener("click", () => {
+  toast(button.dataset.feature + " ainda não está disponível nesta versão.");
+}));
+$("mobileMenu").addEventListener("click", () => {
+  $("sidebar").classList.toggle("open");
+  $("mobileBackdrop").classList.toggle("visible");
+});
+$("sidebarClose").addEventListener("click", () => {
+  $("sidebar").classList.remove("open");
+  $("mobileBackdrop").classList.remove("visible");
+});
+$("mobileBackdrop").addEventListener("click", () => {
+  $("sidebar").classList.remove("open");
+  $("mobileBackdrop").classList.remove("visible");
+});
+$("workspaceSwitch").addEventListener("click", () => toast("Você está no Workspace pessoal deste dispositivo."));
+$("clipSearch").addEventListener("input", drawVisibleResults);
+$("clipSort").addEventListener("change", drawVisibleResults);
+$("refreshResults").addEventListener("click", () => {
+  drawVisibleResults();
+  toast(currentResults.length ? "Lista de clipes atualizada." : "Seus próximos clipes aparecerão aqui.");
+});
 $("uploadDrop").addEventListener("dragover", event => { event.preventDefault(); $("uploadDrop").classList.add("dragging"); });
 $("uploadDrop").addEventListener("dragleave", () => $("uploadDrop").classList.remove("dragging"));
 $("uploadDrop").addEventListener("drop", event => {
