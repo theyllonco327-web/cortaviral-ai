@@ -32,17 +32,17 @@ jobs:
         run: |
           python -m pip install fastapi pydantic python-multipart
           python -m py_compile app.py
-          python - <<'PY'
-import app
-h = app.health()
-assert h["ok"] and h["version"] == "1.8" and h["whisper_model"] == "tiny"
-assert h["clip_duration_seconds"] == {"minimum": 30, "maximum": 90}
-for duration in (30, 31, 59, 90, 91, 100, 181, 5400):
-    windows = app.candidates([], duration)
-    assert windows, f"No windows for source duration {duration}"
-    assert all(30 <= x["end"] - x["start"] <= 90 for x in windows)
-print("Backend health and 30–90s clip-window tests OK")
-PY
+                    python - <<'PY'
+          import app
+          h = app.health()
+          assert h["ok"] and h["version"] == "1.8" and h["whisper_model"] == "tiny"
+          assert h["clip_duration_seconds"] == {"minimum": 30, "maximum": 90}
+          for duration in (30, 31, 59, 90, 91, 100, 181, 5400):
+              windows = app.candidates([], duration)
+              assert windows, f"No windows for source duration {duration}"
+              assert all(30 <= x["end"] - x["start"] <= 90 for x in windows)
+          print("Backend health and 30–90s clip-window tests OK")
+          PY
 
   build-apk:
     runs-on: ubuntu-latest
