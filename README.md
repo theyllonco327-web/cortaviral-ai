@@ -2,6 +2,10 @@
 
 Aplicativo Android híbrido com **Java + HTML + CSS + JavaScript**.
 
+## Interface do estúdio
+
+O painel de edição foi reorganizado para uma experiência de estúdio inspirada no fluxo visual do Cut.Pro: navegação lateral, workspace, entrada de vídeo, configurações de corte, galeria de clipes e histórico. O processamento continua conectado às rotas reais de análise por URL e upload; recursos ainda não implementados aparecem identificados como indisponíveis, em vez de simular funções.
+
 ## Site e aplicativo
 
 - A página pública de apresentação fica em `/`, com formulário de link, explicação dos recursos, fluxo de uso e perguntas frequentes.
