@@ -52,11 +52,20 @@ jobs:
           python - <<'PY'
           import app
           h = app.health()
-          assert h["ok"] and h["app"] == "CortaViral AI" and h["version"] == "2.0"
+          assert h["ok"] and h["app"] == "CortaViral AI" and h["version"] == "2.1"
           assert h["clip_duration_seconds"] == {"minimum": 30, "maximum": 90}
           assert h["upload_endpoint"] == "/api/analyze-upload"
           assert h["url_endpoint"] == "/api/analyze"
-          assert app.AnalyzeRequest(url="https://example.com/video.mp4").subtitles is True
+          request = app.AnalyzeRequest(url="https://example.com/video.mp4")
+          assert request.subtitles is True and request.min_duration == 30 and request.max_duration == 90
+          assert h["configurable_clip_duration_seconds"] == {"minimum": 30, "maximum": 90}
+          assert "visual_activity_analysis" in h["features"]
+          for duration in (60, 61, 100, 181, 5400):
+              custom = app.candidates([], duration, 45, 60)
+              assert custom, f"No custom-duration windows for source duration {duration}"
+              assert all(45 <= x["end"] - x["start"] <= 60 for x in custom)
+          samples = [{"time": 4.0, "score": 0.08}, {"time": 8.0, "score": 0.12}]
+          assert app.visual_window_score(samples, 0, 10) > 0
           routes = {route.path for route in app.app.routes}
           assert {"/api/health", "/api/analyze", "/api/analyze-upload", "/api/jobs/{job}"} <= routes
           for duration in (30, 31, 59, 90, 91, 100, 181, 5400):
