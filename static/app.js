@@ -535,6 +535,11 @@ $("uploadDrop").addEventListener("drop", event => {
     }
   } else toast("Solte um arquivo de vídeo válido.");
 });
+const incomingUrl = new URLSearchParams(location.search).get("url");
+if (incomingUrl && $("videoUrl")) {
+  $("videoUrl").value = incomingUrl;
+  setTimeout(() => $("editorPanel")?.scrollIntoView({behavior:"smooth", block:"start"}), 250);
+}
 renderHistory();
 $("serverAddress").textContent = API_BASE;
 checkServer(true);
