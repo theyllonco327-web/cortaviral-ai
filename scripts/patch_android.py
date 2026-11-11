@@ -356,5 +356,12 @@ source = source.replace(hide_anchor, methods + hide_anchor, 1)
 cover_asset = Path("android/app/src/main/res/drawable-nodpi/cover_photo.jpg")
 if cover_asset.exists():
     cover_asset.unlink()
+
+# The active job identifier is used by the new download-all ZIP action.
+source = source.replace(
+    "    private Button aspectRatioButton;\n",
+    "    private Button aspectRatioButton;\n    private String currentJobId = \"\";\n",
+    1
+)
 path.write_text(source, encoding="utf-8")
 print("Android: interface preservada; polling limitado, timeout e erro detalhado aplicados.")
