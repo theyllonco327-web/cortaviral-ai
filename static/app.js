@@ -7,7 +7,16 @@ let pollTimer = null;
 let serverHealth = null;
 let serverOK = false;
 let toastTimer = null;
-let API_BASE = (localStorage.getItem("cortaviral_server_url") || location.origin).replace(/\/+$/, "");
+function initialApiBase() {
+  const saved = localStorage.getItem("cortaviral_server_url");
+  if (!saved) return location.origin;
+  try { return normaliseServer(saved); }
+  catch (_) {
+    localStorage.removeItem("cortaviral_server_url");
+    return location.origin;
+  }
+}
+let API_BASE = initialApiBase();
 const apiUrl = path => API_BASE + path;
 
 function safeText(value) {
