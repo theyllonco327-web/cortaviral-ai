@@ -21,14 +21,14 @@
       <section class="welcome">
         <div class="eyebrow">SEU ESTÚDIO DE CORTES</div>
         <h1>Transforme vídeos<br><span>em momentos virais.</span></h1>
-        <p>Envie um vídeo do celular ou cole um link público compatível. Seus registros ficam salvos neste aparelho.</p>
+        <p>Envie um vídeo do celular ou cole um link de uma plataforma, site ou endereço direto compatível. Seus registros ficam salvos neste aparelho.</p>
       </section>
 
       <section class="composer panel">
         <div class="section-heading"><span class="heading-icon">↗</span><div><h2>NOVA ANÁLISE</h2><p>Escolha como deseja enviar seu vídeo.</p></div></div>
-        <label class="field-label" for="videoUrl">Link do vídeo</label>
+        <label class="field-label" for="videoUrl">Link do vídeo · site, plataforma ou URL direta</label>
         <div class="url-row">
-          <input id="videoUrl" type="url" inputmode="url" placeholder="Cole um link público do vídeo…" autocomplete="url">
+          <input id="videoUrl" type="url" inputmode="url" placeholder="Cole o link do vídeo…" autocomplete="url">
           <button class="icon-button" id="pasteButton" type="button" aria-label="Colar link">Colar</button>
         </div>
         <div class="or-divider"><span>OU</span></div>
@@ -39,6 +39,7 @@
           <label class="setting"><span>Quantidade de cortes</span><select id="clipCount"><option value="1">1 corte</option><option value="3">3 cortes</option><option value="5" selected>5 cortes</option><option value="7">7 cortes</option><option value="10">10 cortes</option></select></label>
           <label class="setting"><span>Formato</span><select id="aspectRatio"><option value="9:16" selected>Vertical · 9:16</option><option value="1:1">Quadrado · 1:1</option><option value="16:9">Horizontal · 16:9</option></select></label>
         </div>
+        <p class="duration-note">Duração de cada corte: <strong>30 a 90 segundos</strong>. O sistema seleciona os melhores trechos dentro desse intervalo.</p>
         <button class="primary-button" id="analyzeButton" type="button">Analisar vídeo <span>→</span></button>
 
         <div class="progress-panel" id="progressPanel" hidden>
@@ -69,7 +70,7 @@
       <div class="modal-actions"><button class="secondary-button" id="closeSettings" type="button">Cancelar</button><button class="primary-button" id="saveSettings" type="button">Salvar e conectar</button></div>
     </section>
   </div>
-  <footer>Use apenas vídeos que você tenha autorização para editar. O acesso a links de plataformas pode depender das regras e permissões de cada serviço.</footer>
+  <footer>O sistema tenta extrair vídeos de diferentes sites e links diretos. Conteúdos privados, protegidos por DRM, com login ou bloqueados pela plataforma podem não estar disponíveis. Use apenas vídeos que você tenha autorização para editar.</footer>
   </div>
   <script src="/app.js" defer></script>
 </body>
