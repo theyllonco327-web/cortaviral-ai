@@ -372,7 +372,7 @@ def process_local_upload(job, clips, source, folder, aspect_ratio="9:16"):
         update(job, status="processing", progress=15, message="Vídeo recebido. Preparando análise…")
         process_source(job, clips, source, folder, aspect_ratio)
     except Exception as error:
-        update(job, status="error", progress=100, message=str(error)[:1800])
+        update(job, status="error", progress=0, message=str(error)[:1800])
 
 @app.post("/api/analyze-upload")
 async def analyze_upload(
