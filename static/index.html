@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#101923">
   <title>CortaViral AI</title>
-  <link rel="stylesheet" href="/styles.css?v=2.0">
+  <link rel="stylesheet" href="/styles.css?v=2.1">
 </head>
 <body>
   <div class="app-shell">
@@ -68,12 +68,14 @@
         <div class="settings-grid">
           <label class="setting"><span>Quantidade</span><select id="clipCount"><option value="1">1 corte</option><option value="3">3 cortes</option><option value="5" selected>5 cortes</option><option value="7">7 cortes</option><option value="10">10 cortes</option></select></label>
           <label class="setting"><span>Formato do vídeo</span><select id="aspectRatio"><option value="9:16" selected>Vertical · Reels / Shorts</option><option value="1:1">Quadrado · Feed</option><option value="16:9">Horizontal · YouTube</option></select></label>
+          <label class="setting"><span>Duração mínima</span><select id="minDuration"><option value="30" selected>30 segundos</option><option value="45">45 segundos</option><option value="60">60 segundos</option></select></label>
+          <label class="setting"><span>Duração máxima</span><select id="maxDuration"><option value="60">60 segundos</option><option value="75">75 segundos</option><option value="90" selected>90 segundos</option></select></label>
         </div>
         <label class="toggle-row" for="subtitles">
           <span class="toggle-copy"><strong>Legendas automáticas</strong><small>Adicionar legendas ao vídeo quando a transcrição estiver disponível.</small></span>
           <input id="subtitles" type="checkbox" checked><span class="toggle-ui"></span>
         </label>
-        <div class="duration-banner"><span class="duration-icon">◷</span><span><strong>Cortes entre 30 e 90 segundos</strong><small>O sistema seleciona trechos dentro dessa duração.</small></span></div>
+        <div class="duration-banner"><span class="duration-icon">◷</span><span><strong id="durationSummary">Cortes entre 30 e 90 segundos</strong><small>Análise de fala, emoção e movimento visual.</small></span></div>
 
         <button class="primary-button" id="analyzeButton" type="button"><span class="button-icon">✦</span> Analisar e criar cortes <b>→</b></button>
         <div class="progress-panel" id="progressPanel" hidden>
@@ -134,6 +136,6 @@
 
     <footer><strong>CortaViral AI</strong> · Feito para transformar vídeos em conteúdo. Use somente vídeos que você tenha autorização para editar. Plataformas podem restringir downloads automáticos.</footer>
   </div>
-  <script src="/app.js?v=2.0" defer></script>
+  <script src="/app.js?v=2.1" defer></script>
 </body>
 </html>
