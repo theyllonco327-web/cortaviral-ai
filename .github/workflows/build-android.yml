@@ -12,6 +12,9 @@ on:
       - 'render.yaml'
       - 'README.md'
       - 'static/**'
+      - 'streamlit_app.py'
+      - 'requirements-streamlit.txt'
+      - 'tests/**'
       - '.github/workflows/build-android.yml'
   workflow_dispatch:
 
@@ -44,7 +47,7 @@ jobs:
       - name: Check backend syntax and API health
         run: |
           python -m pip install fastapi pydantic python-multipart
-          python -m py_compile app.py
+          python -m py_compile app.py streamlit_app.py tests/test_streamlit_engine.py
           python - <<'PY'
           import app
           h = app.health()
@@ -73,6 +76,30 @@ jobs:
           finally:
               app.WORK = original_work
           print("API contract, HTML bindings, upload, subtitles, job persistence and clip windows OK")
+          PY
+
+  streamlit-engine-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install isolated Streamlit media dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-dejavu-core
+          python -m pip install -r requirements-streamlit.txt
+      - name: Test MoviePy 2 media pipeline
+        run: |
+          python -m py_compile streamlit_app.py tests/test_streamlit_engine.py
+          python - <<'PY'
+          import importlib.util
+          spec = importlib.util.spec_from_file_location("streamlit_engine_test", "tests/test_streamlit_engine.py")
+          module = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+          module.test_moviepy_v2_video_pipeline()
+          print("MoviePy 2 pipeline: synthetic video, 30–90s windows, crop, subtitles and MP4 export OK")
           PY
 
   build-apk:
