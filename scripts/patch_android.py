@@ -225,5 +225,136 @@ welcome = """        LinearLayout welcomeBubble = new LinearLayout(this);
 
 """
 source = source[:cover_start] + welcome + source[cover_end:]
+
+# v1.5 additional functions: paste link, choose number of clips, aspect ratio and ZIP export.
+source = source.replace(
+    "        inputCard.addView(urlInput, urlParams);\n",
+    """        inputCard.addView(urlInput, urlParams);
+        Button pasteButton = button("COLAR LINK DA ÁREA DE TRANSFERÊNCIA", false);
+        LinearLayout.LayoutParams pasteParams = new LinearLayout.LayoutParams(-1, dp(42));
+        pasteParams.topMargin = dp(8);
+        inputCard.addView(pasteButton, pasteParams);
+        pasteButton.setOnClickListener(v -> pasteLink());
+""", 1
+)
+source = source.replace(
+    '        galleryButton.setOnClickListener(v -> openGallery());\n',
+    """        galleryButton.setOnClickListener(v -> openGallery());
+        TextView optionsLabel = text("PREFERÊNCIAS DE CORTE", 10, MUTED, true);
+        LinearLayout.LayoutParams optionsLabelParams = new LinearLayout.LayoutParams(-1, -2);
+        optionsLabelParams.topMargin = dp(16);
+        inputCard.addView(optionsLabel, optionsLabelParams);
+        LinearLayout optionsRow = new LinearLayout(this);
+        optionsRow.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout.LayoutParams optionsRowParams = new LinearLayout.LayoutParams(-1, dp(48));
+        optionsRowParams.topMargin = dp(8);
+        inputCard.addView(optionsRow, optionsRowParams);
+        clipCountButton = button(selectedClips + " CORTES", false);
+        aspectRatioButton = button("FORMATO " + selectedAspectRatio, false);
+        optionsRow.addView(clipCountButton, new LinearLayout.LayoutParams(0, -1, 1));
+        LinearLayout.LayoutParams ratioParams = new LinearLayout.LayoutParams(0, -1, 1);
+        ratioParams.leftMargin = dp(8);
+        optionsRow.addView(aspectRatioButton, ratioParams);
+        clipCountButton.setOnClickListener(v -> chooseClipCount());
+        aspectRatioButton.setOnClickListener(v -> chooseAspectRatio());
+""", 1
+)
+source = source.replace('body.put("clips", 5);', 'body.put("clips", selectedClips);\n                body.put("aspect_ratio", selectedAspectRatio);', 1)
+old_upload = 'out.writeBytes("Content-Disposition: form-data; name=\\"clips\\"\\r\\n\\r\\n5\\r\\n");'
+new_upload = """out.writeBytes("Content-Disposition: form-data; name=\\"clips\\"\\r\\n\\r\\n" + selectedClips + "\\r\\n");
+                out.writeBytes("--" + boundary + "\\r\\n");
+                out.writeBytes("Content-Disposition: form-data; name=\\"aspect_ratio\\"\\r\\n\\r\\n" + selectedAspectRatio + "\\r\\n");"""
+if old_upload not in source:
+    raise SystemExit("Campo multipart clips não encontrado para adicionar formato.")
+source = source.replace(old_upload, new_upload, 1)
+
+source = source.replace(
+    "    private void beginPolling(String jobId) {\n",
+    "    private void beginPolling(String jobId) {\n        currentJobId = jobId;\n",
+    1
+)
+source = source.replace("runOnUiThread(() -> showResults(job));", "runOnUiThread(() -> showResults(job, jobId));", 1)
+source = source.replace("    private void showResults(JSONObject job) {", "    private void showResults(JSONObject job, String jobId) {", 1)
+zip_anchor = "        resultsBox.addView(explanation, expParams);\n"
+if zip_anchor not in source:
+    raise SystemExit("Área de resultados não encontrada.")
+source = source.replace(zip_anchor, zip_anchor + """
+        Button downloadAll = button("BAIXAR TODOS OS CORTES (.ZIP)", true);
+        LinearLayout.LayoutParams downloadAllParams = new LinearLayout.LayoutParams(-1, dp(48));
+        downloadAllParams.topMargin = dp(12);
+        resultsBox.addView(downloadAll, downloadAllParams);
+        downloadAll.setOnClickListener(v -> downloadFile(
+                apiBase() + "/api/jobs/" + jobId + "/download-all",
+                "CortaViral_todos_os_cortes.zip"));
+""", 1)
+
+friendly_anchor = """            String detail = (message == null || message.trim().isEmpty())
+                    ? "Erro de conexão. Confira a URL do servidor nas configurações ⚙."
+                    : message;
+"""
+if friendly_anchor not in source:
+    raise SystemExit("Trecho de mensagem de erro não encontrado.")
+source = source.replace(friendly_anchor, friendly_anchor + """
+            String lowerDetail = detail.toLowerCase(java.util.Locale.ROOT);
+            if (lowerDetail.contains("sign in to confirm you") && lowerDetail.contains("not a bot")) {
+                detail = "O YouTube bloqueou a leitura automática deste link. Não precisamos da sua senha nem dos cookies da conta. Para continuar, toque em IMPORTAR VÍDEO DA GALERIA e selecione o arquivo original que você tem autorização para editar. Também pode tentar um link público direto de MP4.";
+            }
+""", 1)
+
+methods = """
+    private void pasteLink() {
+        try {
+            ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+            if (clipboard != null && clipboard.hasPrimaryClip() && clipboard.getPrimaryClip().getItemCount() > 0) {
+                CharSequence value = clipboard.getPrimaryClip().getItemAt(0).coerceToText(this);
+                if (value != null) {
+                    urlInput.setText(value.toString().trim());
+                    urlInput.setSelection(urlInput.length());
+                    toast("Link colado.");
+                    return;
+                }
+            }
+            toast("A área de transferência está vazia.");
+        } catch (Exception error) {
+            toast("Não foi possível acessar a área de transferência.");
+        }
+    }
+
+    private void chooseClipCount() {
+        String[] labels = {"1 corte", "3 cortes", "5 cortes", "7 cortes", "10 cortes"};
+        int[] values = {1, 3, 5, 7, 10};
+        int selected = 2;
+        for (int i = 0; i < values.length; i++) if (values[i] == selectedClips) selected = i;
+        new AlertDialog.Builder(this).setTitle("Quantidade de cortes")
+                .setSingleChoiceItems(labels, selected, (dialog, which) -> {
+                    selectedClips = values[which];
+                    preferences.edit().putInt("clip_count", selectedClips).apply();
+                    clipCountButton.setText(selectedClips + " CORTES");
+                    dialog.dismiss();
+                }).setNegativeButton("CANCELAR", null).show();
+    }
+
+    private void chooseAspectRatio() {
+        String[] labels = {"Vertical 9:16 (Reels / TikTok / Shorts)", "Quadrado 1:1", "Horizontal 16:9"};
+        String[] values = {"9:16", "1:1", "16:9"};
+        int selected = 0;
+        for (int i = 0; i < values.length; i++) if (values[i].equals(selectedAspectRatio)) selected = i;
+        new AlertDialog.Builder(this).setTitle("Formato dos cortes")
+                .setSingleChoiceItems(labels, selected, (dialog, which) -> {
+                    selectedAspectRatio = values[which];
+                    preferences.edit().putString("aspect_ratio", selectedAspectRatio).apply();
+                    aspectRatioButton.setText("FORMATO " + selectedAspectRatio);
+                    dialog.dismiss();
+                }).setNegativeButton("CANCELAR", null).show();
+    }
+
+"""
+hide_anchor = "    private void hideKeyboard() {\n"
+if hide_anchor not in source:
+    raise SystemExit("Ponto de inserção dos novos métodos não encontrado.")
+source = source.replace(hide_anchor, methods + hide_anchor, 1)
+cover_asset = Path("android/app/src/main/res/drawable-nodpi/cover_photo.jpg")
+if cover_asset.exists():
+    cover_asset.unlink()
 path.write_text(source, encoding="utf-8")
 print("Android: interface preservada; polling limitado, timeout e erro detalhado aplicados.")
