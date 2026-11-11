@@ -28,6 +28,21 @@ Aplicativo Android híbrido com **Java + HTML + CSS + JavaScript**.
 - Histórico local no dispositivo, sem banco remoto de histórico.
 - Configuração do endereço HTTPS do servidor, com rejeição de URLs de plataformas de vídeo usadas por engano como servidor.
 
+## Versão alternativa Streamlit
+
+O projeto também contém uma interface independente em \`streamlit_app.py\`, corrigida para MoviePy 2.x. Ela não substitui nem altera a interface Android/FastAPI usada pelo APK.
+
+Para executar essa versão em outro ambiente Python 3.11 com FFmpeg instalado:
+
+\`\`\`bash
+python -m pip install -r requirements-streamlit.txt
+streamlit run streamlit_app.py
+\`\`\`
+
+A interface alternativa permite importar um vídeo, baixar links públicos compatíveis com yt-dlp, selecionar cortes de 30 a 90 segundos, recortar para 9:16 ou 1:1, aproveitar legendas SRT disponíveis e baixar os cortes individualmente ou em ZIP. O teste automatizado gera um vídeo sintético e verifica o processamento MoviePy 2.x.
+
+A instalação Streamlit fica em um arquivo de dependências separado para não aumentar a imagem Docker do servidor Android nem piorar seu tempo de inicialização no Render.
+
 ## Publicar e gerar APK
 
 O Render publica o backend e a interface estática a partir da branch main. O GitHub Actions verifica a sintaxe JavaScript, valida o backend e compila o APK Android.
