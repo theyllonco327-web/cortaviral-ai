@@ -181,5 +181,49 @@ replace_once(
     "exibição do erro completo"
 )
 
+
+# v1.5 visual refresh: Telegram-inspired blue palette, no hero photo.
+source = source.replace("private static final int BLACK = Color.rgb(5, 8, 5);", "private static final int BLACK = Color.rgb(10, 16, 24);")
+source = source.replace("private static final int PANEL = Color.rgb(15, 22, 16);", "private static final int PANEL = Color.rgb(18, 27, 39);")
+source = source.replace("private static final int PANEL_2 = Color.rgb(20, 31, 22);", "private static final int PANEL_2 = Color.rgb(24, 37, 52);")
+source = source.replace("private static final int NEON = Color.rgb(57, 255, 114);", "private static final int NEON = Color.rgb(42, 153, 255);")
+source = source.replace("private static final int MUTED = Color.rgb(153, 171, 157);", "private static final int MUTED = Color.rgb(151, 171, 193);")
+source = source.replace(
+    "    private SharedPreferences preferences;\n",
+    """    private SharedPreferences preferences;
+    private int selectedClips = 5;
+    private String selectedAspectRatio = "9:16";
+    private Button clipCountButton;
+    private Button aspectRatioButton;
+"""
+)
+source = source.replace(
+    "        preferences = getSharedPreferences(PREFS, MODE_PRIVATE);\n",
+    """        preferences = getSharedPreferences(PREFS, MODE_PRIVATE);
+        selectedClips = preferences.getInt("clip_count", 5);
+        selectedAspectRatio = preferences.getString("aspect_ratio", "9:16");
+"""
+)
+cover_start = source.find("        FrameLayout coverFrame = new FrameLayout(this);")
+cover_end_marker = "        page.addView(coverFrame, coverParams);\n"
+cover_end = source.find(cover_end_marker, cover_start)
+if cover_start < 0 or cover_end < 0:
+    raise SystemExit("Não foi possível localizar a foto de capa antiga.")
+cover_end += len(cover_end_marker)
+welcome = """        LinearLayout welcomeBubble = new LinearLayout(this);
+        welcomeBubble.setOrientation(LinearLayout.VERTICAL);
+        welcomeBubble.setPadding(dp(16), dp(14), dp(16), dp(14));
+        welcomeBubble.setBackground(shape(PANEL_2, 0xFF294B70, 18));
+        welcomeBubble.addView(text("Olá! Vamos transformar seu vídeo em cortes.", 14, WHITE, true));
+        TextView welcomeMessage = text("Envie um link público compatível ou escolha um arquivo da galeria. A análise aparece aqui, como uma conversa.", 12, MUTED, false);
+        LinearLayout.LayoutParams welcomeMessageParams = new LinearLayout.LayoutParams(-1, -2);
+        welcomeMessageParams.topMargin = dp(6);
+        welcomeBubble.addView(welcomeMessage, welcomeMessageParams);
+        LinearLayout.LayoutParams welcomeParams = new LinearLayout.LayoutParams(-1, -2);
+        welcomeParams.topMargin = dp(18);
+        page.addView(welcomeBubble, welcomeParams);
+
+"""
+source = source[:cover_start] + welcome + source[cover_end:]
 path.write_text(source, encoding="utf-8")
 print("Android: interface preservada; polling limitado, timeout e erro detalhado aplicados.")
