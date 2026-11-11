@@ -26,8 +26,21 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: Check JavaScript syntax
-        run: node --check static/app.js
+      - name: Check JavaScript syntax and HTML bindings
+        run: |
+          node --check static/app.js
+          python - <<'PY'
+          import re
+          from pathlib import Path
+          html = Path("static/index.html").read_text(encoding="utf-8")
+          js = Path("static/app.js").read_text(encoding="utf-8")
+          required = set(re.findall(r'\$\("([A-Za-z][A-Za-z0-9]+)"\)', js))
+          required.discard("appToast")
+          present = set(re.findall(r'\bid="([^"]+)"', html))
+          missing = sorted(required - present)
+          assert not missing, f"HTML is missing IDs used by JavaScript: {missing}"
+          print(f"HTML/JS binding check OK ({len(required)} IDs)")
+          PY
       - name: Check backend syntax and API health
         run: |
           python -m pip install fastapi pydantic python-multipart
@@ -46,7 +59,20 @@ jobs:
               windows = app.candidates([], duration)
               assert windows, f"No windows for source duration {duration}"
               assert all(30 <= x["end"] - x["start"] <= 90 for x in windows)
-          print("API contract, upload routes, subtitles and 30–90s windows OK")
+          from pathlib import Path
+          from tempfile import TemporaryDirectory
+          original_work = app.WORK
+          try:
+              with TemporaryDirectory() as temporary:
+                  app.WORK = Path(temporary)
+                  app.JOBS.clear()
+                  app.update("abc123def456", status="completed", results=[])
+                  app.JOBS.clear()
+                  restored = app.read_job("abc123def456")
+                  assert restored and restored["status"] == "completed"
+          finally:
+              app.WORK = original_work
+          print("API contract, HTML bindings, upload, subtitles, job persistence and clip windows OK")
           PY
 
   build-apk:
