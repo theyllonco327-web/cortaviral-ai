@@ -642,6 +642,23 @@ public final class WebMainActivity extends Activity {
                 }
                 return true;
             }
+
+            @Override
+            public void onReceivedError(WebView view, WebResourceRequest request,
+                                        android.webkit.WebResourceError error) {
+                if (request.isForMainFrame()) {
+                    showServerFallback("Não foi possível abrir o servidor. Confira a conexão ou tente o endereço oficial.");
+                }
+            }
+
+            @Override
+            public void onReceivedHttpError(WebView view, WebResourceRequest request,
+                                            android.webkit.WebResourceResponse response) {
+                if (request.isForMainFrame() && response.getStatusCode() >= 400) {
+                    showServerFallback("O servidor respondeu HTTP " + response.getStatusCode()
+                            + ". O endereço pode estar desatualizado ou a publicação ainda não terminou.");
+                }
+            }
         });
 
         webView.setDownloadListener(new DownloadListener() {
@@ -655,6 +672,50 @@ public final class WebMainActivity extends Activity {
 
         setContentView(webView);
         webView.loadUrl(startUrl);
+    }
+
+    private void showServerFallback(String message) {
+        runOnUiThread(() -> {
+            android.widget.LinearLayout panel = new android.widget.LinearLayout(this);
+            panel.setOrientation(android.widget.LinearLayout.VERTICAL);
+            panel.setGravity(android.view.Gravity.CENTER);
+            panel.setPadding(48, 48, 48, 48);
+            panel.setBackgroundColor(android.graphics.Color.rgb(13, 23, 36));
+
+            android.widget.TextView title = new android.widget.TextView(this);
+            title.setText("CortaViral AI");
+            title.setTextColor(android.graphics.Color.WHITE);
+            title.setTextSize(25);
+            title.setGravity(android.view.Gravity.CENTER);
+            title.setTypeface(null, android.graphics.Typeface.BOLD);
+            panel.addView(title);
+
+            android.widget.TextView detail = new android.widget.TextView(this);
+            detail.setText(message);
+            detail.setTextColor(android.graphics.Color.rgb(170, 190, 208));
+            detail.setTextSize(14);
+            detail.setGravity(android.view.Gravity.CENTER);
+            android.widget.LinearLayout.LayoutParams detailParams =
+                    new android.widget.LinearLayout.LayoutParams(-1, -2);
+            detailParams.topMargin = 18;
+            panel.addView(detail, detailParams);
+
+            android.widget.Button retry = new android.widget.Button(this);
+            retry.setText("Reconectar ao servidor oficial");
+            android.widget.LinearLayout.LayoutParams retryParams =
+                    new android.widget.LinearLayout.LayoutParams(-1, -2);
+            retryParams.topMargin = 24;
+            panel.addView(retry, retryParams);
+            retry.setOnClickListener(v -> {
+                getSharedPreferences("cortaviral_settings", MODE_PRIVATE)
+                        .edit().putString("server_url", DEFAULT_SERVER).apply();
+                serverHost = Uri.parse(DEFAULT_SERVER).getHost();
+                setContentView(webView);
+                webView.stopLoading();
+                webView.loadUrl(DEFAULT_SERVER);
+            });
+            setContentView(panel);
+        });
     }
 
     private String normalizeServer(String value) {
