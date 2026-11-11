@@ -822,6 +822,14 @@ public final class WebMainActivity extends Activity {
     }
 }
 """
+web_java = web_java.replace(
+    'String startUrl = normalizeServer(saved);',
+    'String startUrl = normalizeServer(saved) + "app/";'
+)
+web_java = web_java.replace(
+    'webView.loadUrl(DEFAULT_SERVER);',
+    'webView.loadUrl(DEFAULT_SERVER + "app/");'
+)
 Path("android/app/src/main/java/com/cortaviral/ai/WebMainActivity.java").write_text(
     web_java, encoding="utf-8"
 )
