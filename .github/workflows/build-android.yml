@@ -48,6 +48,7 @@ jobs:
           python -m pip install fastapi pydantic python-multipart
           python -m py_compile app.py
           python - <<'PY'
+          from pathlib import Path
           import app
           h = app.health()
           assert h["ok"] and h["app"] == "CortaViral AI" and h["version"] == "2.1"
