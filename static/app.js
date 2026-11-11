@@ -148,13 +148,18 @@ async function checkServer(silent) {
     serverHealth = data;
     const min = data.clip_duration_seconds && data.clip_duration_seconds.minimum;
     const max = data.clip_duration_seconds && data.clip_duration_seconds.maximum;
-    const endpointsOK = data.upload_endpoint === "/api/analyze-upload" && data.url_endpoint === "/api/analyze";
+    const features = Array.isArray(data.features) ? data.features : [];
+    const durationConfig = data.configurable_clip_duration_seconds;
+    const endpointsOK = data.upload_endpoint === "/api/analyze-upload"
+      && data.url_endpoint === "/api/analyze"
+      && durationConfig && durationConfig.minimum === 30 && durationConfig.maximum === 90
+      && features.includes("visual_activity_analysis");
     if (!endpointsOK) {
-      setDiagnostic(false, "Versão incompleta do servidor", "A API respondeu, mas não confirmou os endpoints de URL e galeria. O deploy do backend está desatualizado.", data);
+      setDiagnostic(false, "Versão incompleta do servidor", "A API respondeu, mas ainda não confirmou a análise visual e os controles de duração da versão 2.1. Aguarde a publicação do backend.", data);
       if (!silent) toast("O servidor está online, mas está desatualizado.");
       return false;
     }
-    setDiagnostic(true, "Servidor online · API validada", "API v" + data.version + " ativa. Cortes de " + min + " a " + max + " segundos. Endpoints de URL e galeria encontrados.", data);
+    setDiagnostic(true, "Servidor online · API validada", "API v" + data.version + " ativa. Análise de fala e movimento visual, cortes configuráveis de " + min + " a " + max + " segundos e importação pela galeria.", data);
     if (!silent) toast("Conexão validada. API v" + data.version + ".");
     return true;
   } catch (error) {
@@ -288,7 +293,20 @@ function renderResults(job, jobId, scroll) {
   };
   if (scroll) $("resultsSection").scrollIntoView({behavior:"smooth", block:"start"});
 }
-async function startAnalysis() {
+async function syncDurationRange(changed) {
+  let minimum = Number($("minDuration").value);
+  let maximum = Number($("maxDuration").value);
+  if (minimum > maximum) {
+    if (changed === "minimum") maximum = minimum;
+    else minimum = maximum;
+    $("minDuration").value = String(minimum);
+    $("maxDuration").value = String(maximum);
+    toast("A duração mínima e máxima foram ajustadas para manter uma faixa válida.");
+  }
+  $("durationSummary").textContent = "Cortes entre " + minimum + " e " + maximum + " segundos";
+}
+
+function startAnalysis() {
   const file = $("videoFile").files[0];
   const url = $("videoUrl").value.trim();
   if (!file && !url) {
@@ -319,6 +337,8 @@ async function startAnalysis() {
         form.append("clips", $("clipCount").value);
         form.append("aspect_ratio", $("aspectRatio").value);
         form.append("subtitles", $("subtitles").checked ? "true" : "false");
+        form.append("min_duration", $("minDuration").value);
+        form.append("max_duration", $("maxDuration").value);
         response = await requestJson(apiUrl("/api/analyze-upload"), {
           method:"POST", body:form, signal:controller.signal
         }, "envio da galeria");
@@ -330,7 +350,9 @@ async function startAnalysis() {
             url,
             clips:Number($("clipCount").value),
             aspect_ratio:$("aspectRatio").value,
-            subtitles:$("subtitles").checked
+            subtitles:$("subtitles").checked,
+            min_duration:Number($("minDuration").value),
+            max_duration:Number($("maxDuration").value)
           }),
           signal:controller.signal
         }, "envio da URL");
@@ -418,6 +440,9 @@ async function copyCurrentDiagnostics() {
   ].join("\n");
   await copyText(info);
 }
+$("minDuration").addEventListener("change", () => syncDurationRange("minimum"));
+$("maxDuration").addEventListener("change", () => syncDurationRange("maximum"));
+syncDurationRange();
 $("analyzeButton").addEventListener("click", startAnalysis);
 $("retryButton").addEventListener("click", startAnalysis);
 $("pasteButton").addEventListener("click", async () => {
