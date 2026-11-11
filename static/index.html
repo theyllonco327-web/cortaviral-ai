@@ -14,7 +14,7 @@
         <div class="brand-mark">CV</div>
         <div><strong>CortaViral <span>AI</span></strong><small>EDITOR INTELIGENTE</small></div>
       </div>
-      <div class="connection" id="connection"><i></i><span>Verificando servidor…</span></div>
+      <div class="top-actions"><div class="connection" id="connection"><i></i><span>Verificando servidor…</span></div><button class="settings-button" id="settingsButton" type="button" aria-label="Configurações">⚙</button></div>
     </header>
 
     <main>
@@ -60,7 +60,16 @@
         <p class="disclaimer" id="scoreNote">A pontuação é uma estimativa de retenção, não uma promessa de viralização.</p>
       </section>
     </main>
-    <footer>Use apenas vídeos que você tenha autorização para editar. O acesso a links de plataformas pode depender das regras e permissões de cada serviço.</footer>
+    <div class="modal-backdrop" id="settingsModal" hidden>
+    <section class="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+      <h2 id="settingsTitle">Configurações do servidor</h2>
+      <p>Informe somente o endereço HTTPS do servidor, sem /api/health.</p>
+      <label for="serverUrl">Endereço do servidor</label>
+      <input id="serverUrl" type="url" placeholder="https://seu-servidor.onrender.com">
+      <div class="modal-actions"><button class="secondary-button" id="closeSettings" type="button">Cancelar</button><button class="primary-button" id="saveSettings" type="button">Salvar e conectar</button></div>
+    </section>
+  </div>
+  <footer>Use apenas vídeos que você tenha autorização para editar. O acesso a links de plataformas pode depender das regras e permissões de cada serviço.</footer>
   </div>
   <script src="/app.js" defer></script>
 </body>
