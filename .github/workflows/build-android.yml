@@ -30,10 +30,11 @@ jobs:
       - name: Check JavaScript syntax and HTML bindings
         run: |
           node --check static/app.js
+          node --check static/landing.js
           python - <<'PY'
           import re
           from pathlib import Path
-          html = Path("static/index.html").read_text(encoding="utf-8")
+          html = Path("static/app.html").read_text(encoding="utf-8")
           js = Path("static/app.js").read_text(encoding="utf-8")
           required = set(re.findall(r'\$\("([A-Za-z][A-Za-z0-9]+)"\)', js))
           required.discard("appToast")
