@@ -3,7 +3,7 @@ const HISTORY_KEY = "cortaviral_local_history_v1";
 let activeJob = "";
 let activeSource = "";
 let pollTimer = null;
-let API_BASE = (localStorage.getItem("cortaviral_server_url") || location.origin).replace(/\\/+$/, "");
+let API_BASE = (localStorage.getItem("cortaviral_server_url") || location.origin).replace(/\/+$/, "");
 const apiUrl = path => API_BASE + path;
 
 function safeText(value) {
