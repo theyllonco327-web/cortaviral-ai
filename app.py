@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 BASE = Path(__file__).resolve().parent
 WORK, OUT = BASE / "work", BASE / "outputs"
 WORK.mkdir(exist_ok=True); OUT.mkdir(exist_ok=True)
-app = FastAPI(title="CortaViral AI", version="1.9")
+app = FastAPI(title="CortaViral AI", version="2.1")
 JOBS, LOCK = {}, threading.Lock()
 MODEL_LOCK = threading.Lock()
 WHISPER_INSTANCE = None
@@ -22,6 +22,8 @@ class AnalyzeRequest(BaseModel):
     clips: int = Field(5, ge=1, le=10)
     aspect_ratio: str = Field("9:16", pattern=r"^(9:16|1:1|16:9)$")
     subtitles: bool = True
+    min_duration: int = Field(30, ge=30, le=90)
+    max_duration: int = Field(90, ge=30, le=90)
 
 def update(job, **data):
     # Mantém cache em memória e um espelho JSON no disco temporário do servidor.
@@ -148,6 +150,43 @@ def duration_of(path):
         "-of", "default=noprint_wrappers=1:nokey=1", str(path)
     ], 60))
 
+def visual_activity(path):
+    """Mede mudanças entre quadros pequenos, amostrados a cada quatro segundos."""
+    command = [
+        "ffmpeg", "-nostdin", "-v", "error", "-i", str(path),
+        "-vf", "fps=1/4,scale=96:54:flags=area,format=gray",
+        "-f", "rawvideo", "-pix_fmt", "gray", "pipe:1"
+    ]
+    frame_size = 96 * 54
+    try:
+        result = subprocess.run(command, capture_output=True, timeout=1800)
+        if result.returncode != 0:
+            return []
+        raw = result.stdout
+        samples, previous = [], None
+        frame_index = 0
+        for offset in range(0, len(raw) - frame_size + 1, frame_size):
+            frame = raw[offset:offset + frame_size]
+            if previous is not None:
+                difference = sum(abs(a - b) for a, b in zip(frame, previous))
+                samples.append({"time": frame_index * 4.0, "score": difference / (frame_size * 255.0)})
+            previous = frame
+            frame_index += 1
+        return samples
+    except (OSError, subprocess.SubprocessError):
+        return []
+
+
+def visual_window_score(samples, start, end):
+    values = [item["score"] for item in samples if start <= item["time"] <= end]
+    if not values:
+        return 0
+    values.sort()
+    peak = values[min(len(values) - 1, int((len(values) - 1) * 0.85))]
+    average = sum(values) / len(values)
+    return min(25, int(average * 180 + peak * 80))
+
+
 def transcribe(path):
     global WHISPER_INSTANCE, WHISPER_INSTANCE_NAME
     from faster_whisper import WhisperModel
@@ -224,33 +263,38 @@ def score_text(text, seconds, speech):
         reasons.append("ênfase na fala")
     return max(0, min(100, score)), reasons or ["trecho com fala contínua"]
 
-def candidates(segs, total):
+def candidates(segs, total, min_duration=MIN_CLIP_SECONDS, max_duration=MAX_CLIP_SECONDS, visual_samples=None):
     found = []
+    visual_samples = visual_samples or []
     if not segs:
-        # Sem transcrição, distribuir janelas pelo vídeo inteiro sem fingir
-        # que existe uma análise semântica do conteúdo.
-        # Janelas próximas de 90s, respeitando o mínimo de 30s.
-        count = min(60, max(1, math.ceil(total / MAX_CLIP_SECONDS)))
+        # Sem transcrição, dividir em janelas válidas e priorizar as que têm
+        # mais movimento visual, sem alegar análise semântica do conteúdo.
+        count = min(60, max(1, math.ceil(total / max_duration)))
         step = total / count
+        if step < min_duration:
+            count, step = 1, total
+        window = min(max_duration, step)
         for index in range(count):
             start = index * step
-            window = min(MAX_CLIP_SECONDS, step)
             end = min(total, start + window)
-            if MIN_CLIP_SECONDS <= end - start <= MAX_CLIP_SECONDS:
+            if min_duration <= end - start <= max_duration:
+                visual_score = visual_window_score(visual_samples, start, end)
+                reasons = ["movimento visual analisado"] if visual_score else ["janela de duração válida"]
+                reasons.append("transcrição indisponível")
                 found.append({
-                    "start": start, "end": end, "text": "", "score": 50,
-                    "reasons": ["janela de duração válida; transcrição indisponível"]
+                    "start": start, "end": end, "text": "",
+                    "score": min(75, 50 + visual_score), "reasons": reasons
                 })
-        return found
+        return sorted(found, key=lambda item: item["score"], reverse=True)
 
     for i, first in enumerate(segs):
         start = max(0, first["start"] - .35)
         for j in range(i, len(segs)):
             end = segs[j]["end"] + .25
             length = end - start
-            if length > MAX_CLIP_SECONDS:
+            if length > max_duration:
                 break
-            if length < MIN_CLIP_SECONDS:
+            if length < min_duration:
                 continue
             part = segs[i:j + 1]
             text = " ".join(x["text"] for x in part)
@@ -258,12 +302,15 @@ def candidates(segs, total):
             if len(text.split()) < 15:
                 continue
             score, reasons = score_text(text, length, speech)
+            visual_score = visual_window_score(visual_samples, start, end)
+            if visual_score:
+                score = min(100, score + visual_score)
+                reasons.append("movimento visual analisado")
             found.append({
                 "start": start, "end": end, "text": text,
                 "score": score, "reasons": reasons
             })
-            # Explora a faixa inteira permitida, até 90 segundos.
-            if length >= MAX_CLIP_SECONDS:
+            if length >= max_duration:
                 break
 
     found.sort(key=lambda x: x["score"], reverse=True)
@@ -297,11 +344,12 @@ def make_srt(segs, start, end, path):
         number += 1
     path.write_text("\n".join(lines), encoding="utf-8")
 
-def render(source, candidate, index, folder, segs, aspect_ratio="9:16", subtitles_enabled=True):
+def render(source, candidate, index, folder, segs, aspect_ratio="9:16", subtitles_enabled=True,
+           min_duration=MIN_CLIP_SECONDS, max_duration=MAX_CLIP_SECONDS):
     start, end = candidate["start"], candidate["end"]
     duration = end - start
-    if not MIN_CLIP_SECONDS <= duration <= MAX_CLIP_SECONDS:
-        raise RuntimeError("Um corte ficou fora da duração permitida de 30 a 90 segundos.")
+    if not min_duration <= duration <= max_duration:
+        raise RuntimeError(f"Um corte ficou fora da duração configurada de {min_duration} a {max_duration} segundos.")
     output = OUT / f"{folder.name}_corte_{index:02}.mp4"
     srt = folder / f"clip_{index:02}.srt"
     make_srt(segs, start, end, srt)
@@ -334,10 +382,15 @@ def render(source, candidate, index, folder, segs, aspect_ratio="9:16", subtitle
         run(command, 1800)
     return output
 
-def process_source(job, clips, source, folder, aspect_ratio="9:16", subtitles_enabled=True):
+def process_source(job, clips, source, folder, aspect_ratio="9:16", subtitles_enabled=True,
+                   min_duration=MIN_CLIP_SECONDS, max_duration=MAX_CLIP_SECONDS):
+    if not MIN_CLIP_SECONDS <= min_duration <= max_duration <= MAX_CLIP_SECONDS:
+        raise RuntimeError("Configure a duração mínima e máxima entre 30 e 90 segundos.")
     total = duration_of(source)
-    if total < MIN_CLIP_SECONDS:
-        raise RuntimeError("O vídeo de origem precisa ter pelo menos 30 segundos.")
+    if total < min_duration:
+        raise RuntimeError(f"O vídeo de origem precisa ter pelo menos {min_duration} segundos.")
+    update(job, progress=12, message="Analisando movimento visual do vídeo…")
+    visual_samples = visual_activity(source)
     update(job, progress=20, message="Vídeo recebido. Transcrevendo o conteúdo completo…")
     try:
         segs, language = transcribe(source)
@@ -349,7 +402,7 @@ def process_source(job, clips, source, folder, aspect_ratio="9:16", subtitles_en
             "). Os cortes foram distribuídos por duração, sem análise semântica do conteúdo."
         )
     update(job, progress=45, message="Encontrando os melhores momentos entre 30 e 90 segundos…")
-    options = candidates(segs, total)
+    options = candidates(segs, total, min_duration, max_duration, visual_samples)
     chosen = []
     for candidate in options:
         if all(
@@ -369,7 +422,10 @@ def process_source(job, clips, source, folder, aspect_ratio="9:16", subtitles_en
             progress=50 + int(45 * (index - 1) / max(1, len(chosen))),
             message=f"Renderizando corte {index} de {len(chosen)}…"
         )
-        file = render(source, candidate, index, folder, segs, aspect_ratio, subtitles_enabled)
+        file = render(
+            source, candidate, index, folder, segs, aspect_ratio, subtitles_enabled,
+            min_duration, max_duration
+        )
         text = candidate["text"]
         results.append({
             "number": index,
@@ -386,7 +442,9 @@ def process_source(job, clips, source, folder, aspect_ratio="9:16", subtitles_en
         job, status="completed", progress=100, message="Cortes prontos!",
         results=results, transcript_note=note,
         source_duration=round(total, 1),
-        score_note="A nota é uma estimativa heurística de potencial de retenção; não prevê nem garante viralização."
+        score_note="A nota combina sinais de fala e movimento visual; é uma estimativa heurística e não garante viralização.",
+        clip_duration_seconds={"minimum": min_duration, "maximum": max_duration},
+        visual_analysis="atividade visual amostrada em baixa resolução"
     )
 
 def process(job, req):
@@ -395,14 +453,21 @@ def process(job, req):
     try:
         update(job, status="processing", progress=3, message="Baixando vídeo da URL informada…")
         source = download(validate_url(req.url), folder)
-        process_source(job, req.clips, source, folder, req.aspect_ratio, req.subtitles)
+        process_source(
+            job, req.clips, source, folder, req.aspect_ratio, req.subtitles,
+            req.min_duration, req.max_duration
+        )
     except Exception as error:
         update(job, status="error", progress=0, message=str(error)[:1800])
 
-def process_local_upload(job, clips, source, folder, aspect_ratio="9:16", subtitles_enabled=True):
+def process_local_upload(job, clips, source, folder, aspect_ratio="9:16", subtitles_enabled=True,
+                         min_duration=MIN_CLIP_SECONDS, max_duration=MAX_CLIP_SECONDS):
     try:
         update(job, status="processing", progress=15, message="Vídeo recebido. Preparando análise…")
-        process_source(job, clips, source, folder, aspect_ratio, subtitles_enabled)
+        process_source(
+            job, clips, source, folder, aspect_ratio, subtitles_enabled,
+            min_duration, max_duration
+        )
     except Exception as error:
         update(job, status="error", progress=0, message=str(error)[:1800])
 
@@ -412,12 +477,16 @@ async def analyze_upload(
     file: UploadFile = File(...),
     clips: int = Form(5),
     aspect_ratio: str = Form("9:16"),
-    subtitles: bool = Form(True)
+    subtitles: bool = Form(True),
+    min_duration: int = Form(30),
+    max_duration: int = Form(90)
 ):
     if clips < 1 or clips > 10:
         raise HTTPException(400, "A quantidade de cortes precisa ficar entre 1 e 10.")
     if aspect_ratio not in {"9:16", "1:1", "16:9"}:
         raise HTTPException(400, "Formato inválido. Escolha 9:16, 1:1 ou 16:9.")
+    if not MIN_CLIP_SECONDS <= min_duration <= max_duration <= MAX_CLIP_SECONDS:
+        raise HTTPException(400, "A duração mínima e máxima precisa ficar entre 30 e 90 segundos, com mínimo menor ou igual ao máximo.")
     filename = file.filename or "video.mp4"
     extension = Path(filename).suffix.lower()
     allowed = {".mp4", ".mov", ".mkv", ".webm", ".m4v", ".avi", ".flv", ".ts", ".mpg", ".mpeg", ".3gp", ".3g2"}
@@ -445,11 +514,16 @@ async def analyze_upload(
         destination.unlink(missing_ok=True)
         raise HTTPException(400, "O arquivo de vídeo está vazio.")
     update(job, status="queued", progress=5, message="Vídeo enviado. Entrando na fila…")
-    background.add_task(process_local_upload, job, clips, destination, folder, aspect_ratio, subtitles)
+    background.add_task(
+        process_local_upload, job, clips, destination, folder, aspect_ratio, subtitles,
+        min_duration, max_duration
+    )
     return {"job_id": job}
 
 @app.post("/api/analyze")
 def analyze(req: AnalyzeRequest, background: BackgroundTasks):
+    if req.min_duration > req.max_duration:
+        raise HTTPException(400, "A duração mínima não pode ser maior que a duração máxima.")
     job = uuid.uuid4().hex[:12]
     (WORK / job).mkdir(parents=True, exist_ok=True)
     update(job, status="queued", progress=0, message="Na fila…")
@@ -491,18 +565,19 @@ def health():
     return {
         "ok": True,
         "app": "CortaViral AI",
-        "version": "2.0",
+        "version": "2.1",
         "api_contract": "cortaviral-v1",
         "deployment_commit": os.getenv("RENDER_GIT_COMMIT", "unknown"),
         "whisper_model": os.getenv("WHISPER_MODEL", "tiny"),
         "sources": ["yt_dlp_supported_sites", "generic_web_pages", "direct_video_url", "gallery_upload"],
         "clip_duration_seconds": {"minimum": MIN_CLIP_SECONDS, "maximum": MAX_CLIP_SECONDS},
+        "configurable_clip_duration_seconds": {"minimum": MIN_CLIP_SECONDS, "maximum": MAX_CLIP_SECONDS},
         "url_download": "yt_dlp_auto_extractor_with_generic_fallback",
         "upload_endpoint": "/api/analyze-upload",
         "url_endpoint": "/api/analyze",
         "download_all_endpoint": "/api/jobs/{job_id}/download-all",
         "aspect_ratios": ["9:16", "1:1", "16:9"],
-        "features": ["broad_url_extractor_support", "generic_extractor_fallback", "gallery_upload", "optional_subtitles", "30_to_90_second_clips", "batch_download", "multiple_aspect_ratios", "local_device_history"],
+        "features": ["broad_url_extractor_support", "generic_extractor_fallback", "gallery_upload", "optional_subtitles", "30_to_90_second_clips", "configurable_clip_duration", "speech_analysis", "visual_activity_analysis", "batch_download", "multiple_aspect_ratios", "local_device_history"],
         "history_storage": "android_device_only"
     }
 
