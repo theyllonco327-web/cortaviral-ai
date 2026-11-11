@@ -35,3 +35,6 @@ footer{padding:26px 5px 0;text-align:center;color:#738aa2;font-size:10px;line-he
 .modal-actions{display:flex;gap:8px;margin-top:16px}
 .modal-actions>*{flex:1}
 @media(max-width:420px){.connection{max-width:160px;overflow:hidden}.connection span{overflow:hidden;text-overflow:ellipsis}}
+
+.duration-note{margin:12px 2px 0;color:#a8bdd1;font-size:10px;line-height:1.5}
+.duration-note strong{color:#8ecaff}
