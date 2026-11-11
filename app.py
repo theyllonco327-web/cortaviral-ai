@@ -581,5 +581,14 @@ def health():
         "history_storage": "android_device_only"
     }
 
+@app.get("/", include_in_schema=False)
+def landing_page():
+    return FileResponse(str(BASE / "static" / "index.html"), media_type="text/html")
+
+@app.get("/app", include_in_schema=False)
+@app.get("/app/", include_in_schema=False)
+def editor_page():
+    return FileResponse(str(BASE / "static" / "app.html"), media_type="text/html")
+
 app.mount("/outputs", StaticFiles(directory=str(OUT)), name="outputs")
 app.mount("/", StaticFiles(directory=str(BASE / "static"), html=True), name="static")
