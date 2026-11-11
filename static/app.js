@@ -293,7 +293,7 @@ function renderResults(job, jobId, scroll) {
   };
   if (scroll) $("resultsSection").scrollIntoView({behavior:"smooth", block:"start"});
 }
-async function syncDurationRange(changed) {
+function syncDurationRange(changed) {
   let minimum = Number($("minDuration").value);
   let maximum = Number($("maxDuration").value);
   if (minimum > maximum) {
@@ -306,7 +306,7 @@ async function syncDurationRange(changed) {
   $("durationSummary").textContent = "Cortes entre " + minimum + " e " + maximum + " segundos";
 }
 
-function startAnalysis() {
+async function startAnalysis() {
   const file = $("videoFile").files[0];
   const url = $("videoUrl").value.trim();
   if (!file && !url) {
