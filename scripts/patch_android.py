@@ -296,8 +296,11 @@ if friendly_anchor not in source:
     raise SystemExit("Trecho de mensagem de erro não encontrado.")
 source = source.replace(friendly_anchor, friendly_anchor + """
             String lowerDetail = detail.toLowerCase(java.util.Locale.ROOT);
-            if (lowerDetail.contains("sign in to confirm you") && lowerDetail.contains("not a bot")) {
-                detail = "O YouTube bloqueou a leitura automática deste link. Não precisamos da sua senha nem dos cookies da conta. Para continuar, toque em IMPORTAR VÍDEO DA GALERIA e selecione o arquivo original que você tem autorização para editar. Também pode tentar um link público direto de MP4.";
+            boolean youtubeBotBlock = lowerDetail.contains("not a bot")
+                    || (lowerDetail.contains("sign in to confirm") && lowerDetail.contains("youtube"))
+                    || lowerDetail.contains("confirm you’re not");
+            if (youtubeBotBlock) {
+                detail = "O YouTube bloqueou a leitura automática deste link. O servidor está conectado, mas a plataforma não liberou o arquivo. Para continuar, toque em IMPORTAR VÍDEO DA GALERIA e selecione um vídeo que você tenha autorização para editar. Não informe senha nem cookies.";
             }
 """, 1)
 
