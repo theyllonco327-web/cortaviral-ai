@@ -15,6 +15,7 @@ on:
       - 'streamlit_app.py'
       - 'requirements-streamlit.txt'
       - 'tests/**'
+      - '.devcontainer/**'
       - '.github/workflows/build-android.yml'
   workflow_dispatch:
 
