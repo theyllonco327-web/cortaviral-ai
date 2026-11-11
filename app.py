@@ -9,13 +9,13 @@ from pydantic import BaseModel, Field
 BASE = Path(__file__).resolve().parent
 WORK, OUT = BASE / "work", BASE / "outputs"
 WORK.mkdir(exist_ok=True); OUT.mkdir(exist_ok=True)
-app = FastAPI(title="CortaViral AI", version="1.3")
+app = FastAPI(title="CortaViral AI", version="1.8")
 JOBS, LOCK = {}, threading.Lock()
 MODEL_LOCK = threading.Lock()
 WHISPER_INSTANCE = None
 WHISPER_INSTANCE_NAME = None
 MIN_CLIP_SECONDS = 30
-MAX_CLIP_SECONDS = 60
+MAX_CLIP_SECONDS = 90
 
 class AnalyzeRequest(BaseModel):
     url: str
@@ -81,7 +81,19 @@ def download(url, folder):
     command.append(url)
     try:
         run(command, timeout=1800)
-    except RuntimeError as error:
+    except RuntimeError as first_error:
+        # Tenta o extrator genérico como segunda opção em sites não bloqueados.
+        # Isso não contorna login, DRM, paywall ou bloqueios da plataforma.
+        error = first_error
+        if not is_youtube and not is_tiktok:
+            for partial in folder.glob("source.*"):
+                if partial.is_file():
+                    partial.unlink(missing_ok=True)
+            generic_command = command[:-1] + ["--force-generic-extractor", url]
+            try:
+                run(generic_command, timeout=1800)
+            except RuntimeError as generic_error:
+                error = generic_error
         detail = str(error)
         lowered = detail.lower()
         if is_youtube and ("not a bot" in lowered or "sign in to confirm" in lowered or "confirm you’re not" in lowered):
@@ -170,7 +182,7 @@ def score_text(text, seconds, speech):
     score += 18 if 115 <= wpm <= 210 else 12 if 85 <= wpm <= 240 else 6
     score += int(16 * speech_ratio)
     score += 12 if count >= 45 else 8 if count >= 25 else 4
-    score += 10 if 35 <= seconds <= 55 else 7
+    score += 10 if 45 <= seconds <= 75 else 7
     if any(filler in low for filler in FILLERS):
         score -= 3
 
@@ -192,7 +204,8 @@ def candidates(segs, total):
     if not segs:
         # Sem transcrição, distribuir janelas pelo vídeo inteiro sem fingir
         # que existe uma análise semântica do conteúdo.
-        count = min(60, max(1, int(total // MIN_CLIP_SECONDS)))
+        # Janelas próximas de 90s, respeitando o mínimo de 30s.
+        count = min(60, max(1, math.ceil(total / MAX_CLIP_SECONDS)))
         step = total / count
         for index in range(count):
             start = index * step
@@ -224,8 +237,8 @@ def candidates(segs, total):
                 "start": start, "end": end, "text": text,
                 "score": score, "reasons": reasons
             })
-            # Evita dezenas de variações quase idênticas do mesmo início.
-            if length >= 48:
+            # Explora a faixa inteira permitida, até 90 segundos.
+            if length >= MAX_CLIP_SECONDS:
                 break
 
     found.sort(key=lambda x: x["score"], reverse=True)
@@ -263,7 +276,7 @@ def render(source, candidate, index, folder, segs, aspect_ratio="9:16"):
     start, end = candidate["start"], candidate["end"]
     duration = end - start
     if not MIN_CLIP_SECONDS <= duration <= MAX_CLIP_SECONDS:
-        raise RuntimeError("Um corte ficou fora da duração permitida de 30 a 60 segundos.")
+        raise RuntimeError("Um corte ficou fora da duração permitida de 30 a 90 segundos.")
     output = OUT / f"{folder.name}_corte_{index:02}.mp4"
     srt = folder / f"clip_{index:02}.srt"
     make_srt(segs, start, end, srt)
@@ -310,7 +323,7 @@ def process_source(job, clips, source, folder, aspect_ratio="9:16"):
             "A transcrição não ficou disponível (" + str(error)[:220] +
             "). Os cortes foram distribuídos por duração, sem análise semântica do conteúdo."
         )
-    update(job, progress=45, message="Encontrando os melhores momentos entre 30 e 60 segundos…")
+    update(job, progress=45, message="Encontrando os melhores momentos entre 30 e 90 segundos…")
     options = candidates(segs, total)
     chosen = []
     for candidate in options:
@@ -322,7 +335,7 @@ def process_source(job, clips, source, folder, aspect_ratio="9:16"):
         if len(chosen) >= clips:
             break
     if not chosen:
-        raise RuntimeError("Não encontramos trechos de 30 a 60 segundos neste vídeo. Tente outro vídeo ou uma quantidade menor de cortes.")
+        raise RuntimeError("Não encontramos trechos de 30 a 90 segundos neste vídeo. Tente outro vídeo ou uma quantidade menor de cortes.")
     chosen.sort(key=lambda item: item["start"])
     results = []
     for index, candidate in enumerate(chosen, 1):
@@ -455,15 +468,16 @@ def health():
     return {
         "ok": True,
         "app": "CortaViral AI",
-        "version": "1.7",
+        "version": "1.8",
         "whisper_model": os.getenv("WHISPER_MODEL", "tiny"),
         "sources": ["youtube", "tiktok", "direct_video_url", "gallery_upload"],
         "clip_duration_seconds": {"minimum": MIN_CLIP_SECONDS, "maximum": MAX_CLIP_SECONDS},
+        "url_download": "yt_dlp_auto_extractor_with_generic_fallback",
         "upload_endpoint": "/api/analyze-upload",
         "url_endpoint": "/api/analyze",
         "download_all_endpoint": "/api/jobs/{job_id}/download-all",
         "aspect_ratios": ["9:16", "1:1", "16:9"],
-        "features": ["url_analysis", "gallery_upload", "automatic_subtitles", "batch_download", "multiple_aspect_ratios", "android_local_sqlite_history"],
+        "features": ["broad_url_extractor_support", "generic_extractor_fallback", "gallery_upload", "automatic_subtitles", "30_to_90_second_clips", "batch_download", "multiple_aspect_ratios", "android_local_sqlite_history"],
         "history_storage": "android_device_only"
     }
 
