@@ -273,7 +273,7 @@ function makeClipCard(clip) {
   share.textContent = "Compartilhar";
   share.addEventListener("click", () => shareClip(clip, videoUrl));
   actions.append(download,copy,share);
-  card.append(top,transcript,tags,video,actions);
+  card.append(video,top,transcript,tags,actions);
   return card;
 }
 function drawVisibleResults() {
@@ -513,7 +513,6 @@ function openSettings() {
 }
 $("settingsButton").addEventListener("click", openSettings);
 $("topSettings").addEventListener("click", openSettings);
-$("closeSettings").addEventListener("click", () => { $("settingsModal").hidden = true; });
 $("closeSettings").addEventListener("click", () => { $("settingsModal").hidden = true; });
 $("settingsModal").addEventListener("click", event => {
   if (event.target === $("settingsModal")) $("settingsModal").hidden = true;
