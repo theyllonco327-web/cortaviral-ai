@@ -1,6 +1,7 @@
 const $ = id => document.getElementById(id);
 const HISTORY_KEY = "cortaviral_local_history_v2";
-const DEFAULT_SERVER = "https://cortaviral-ai.onrender.com";
+const LEGACY_SERVER = "https://cortaviral-ai.onrender.com";
+const DEFAULT_SERVER = location.origin;
 let activeJob = "";
 let activeSource = "";
 let currentResults = [];
@@ -10,14 +11,16 @@ let serverHealth = null;
 let serverOK = false;
 let toastTimer = null;
 function initialApiBase() {
-  const currentHost = location.hostname.toLowerCase();
-  if (currentHost.endsWith(".app.github.dev") || currentHost === "github.dev") {
-    localStorage.setItem("cortaviral_server_url", DEFAULT_SERVER);
-    if (location.origin !== DEFAULT_SERVER) location.replace(DEFAULT_SERVER + "/");
-    return DEFAULT_SERVER;
-  }
   const saved = localStorage.getItem("cortaviral_server_url");
   if (!saved) return location.origin;
+
+  // Remove o endereço padrão antigo quando o site estiver hospedado
+  // em outro domínio. A versão web usa o mesmo domínio para página e API.
+  if (saved === LEGACY_SERVER && location.origin !== LEGACY_SERVER) {
+    localStorage.removeItem("cortaviral_server_url");
+    return location.origin;
+  }
+
   try { return normaliseServer(saved); }
   catch (_) {
     localStorage.removeItem("cortaviral_server_url");
@@ -533,13 +536,10 @@ $("saveSettings").addEventListener("click", () => {
   }
 });
 $("useDefaultServer").addEventListener("click", () => {
-  localStorage.setItem("cortaviral_server_url", DEFAULT_SERVER);
+  localStorage.removeItem("cortaviral_server_url");
   $("settingsModal").hidden = true;
-  if (location.origin !== DEFAULT_SERVER) location.replace(DEFAULT_SERVER + "/");
-  else {
-    API_BASE = DEFAULT_SERVER;
-    checkServer(false);
-  }
+  API_BASE = location.origin;
+  checkServer(false);
 });
 document.querySelectorAll("[data-scroll]").forEach(button => button.addEventListener("click", () => {
   const target = $(button.dataset.scroll);
