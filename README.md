@@ -1,33 +1,40 @@
 # CortaViral AI
 
-O CortaViral AI agora possui um backend FastAPI e um aplicativo Android nativo.
+Aplicativo Android híbrido com **Java + HTML + CSS + JavaScript**.
 
-## Gerar o APK
-1. Abra a aba **Actions** deste repositório.
-2. Selecione **Build CortaViral AI APK**.
-3. Aguarde os jobs **backend-check** e **build-apk** concluírem com sucesso.
-4. Abra a execução e baixe o artefato **cortaviral-ai-debug-apk**.
-5. Extraia o arquivo baixado e instale `app-debug.apk` no Android.
+## Arquitetura atual
 
-O workflow também pode ser iniciado manualmente em **Actions → Build CortaViral AI APK → Run workflow**.
+- **Java Android (WebMainActivity)**: abre o aplicativo em WebView, permite escolher vídeos da galeria e recebe downloads.
+- **HTML (static/index.html)**: estrutura das telas.
+- **CSS (static/styles.css)**: identidade visual responsiva inspirada em aplicativos de mensagens.
+- **JavaScript (static/app.js)**: envio de links e vídeos, acompanhamento das tarefas, apresentação dos cortes e histórico local via localStorage do navegador/WebView.
+- **Backend de processamento**: FastAPI/Python permanece temporariamente responsável por yt-dlp, FFmpeg e Faster-Whisper. Essa parte não foi reescrita porque trocar a linguagem não elimina bloqueios de acesso impostos pelo YouTube e uma migração do motor de mídia exige testes próprios.
 
-## Recursos do app Android
-- Interface nativa em preto com contornos e destaques verde neon.
-- Foto enviada pelo usuário na capa.
-- Análise de vídeos por URL.
-- Seleção e envio de vídeos da galeria do Android.
-- Acompanhamento do processamento.
-- Download dos cortes MP4 gerados.
-- Cortes com duração entre **30 e 60 segundos**.
-- Campo para configurar o endereço HTTPS do backend Render.
+## Recursos
 
-## Configuração do servidor
-Na primeira abertura, informe a URL HTTPS pública do serviço Render. O app utiliza:
-- `POST /api/analyze` para links do YouTube, TikTok e outras fontes compatíveis;
-- `POST /api/analyze-upload` para vídeos selecionados no celular;
-- `GET /api/jobs/{job_id}` para acompanhar o processamento.
+- Análise por URL pública compatível.
+- Importação de vídeos da galeria Android.
+- Escolha de 1, 3, 5, 7 ou 10 cortes.
+- Formatos 9:16, 1:1 e 16:9.
+- Cortes de 30 a 60 segundos.
+- Legendas automáticas quando a transcrição está disponível.
+- Pré-visualização e download dos cortes.
+- Histórico local no dispositivo, sem banco remoto de histórico.
+- Configuração do endereço HTTPS do servidor.
 
-## Limites reais
-A aplicação não impõe limite artificial de duração ao vídeo original, mas o servidor ainda depende de CPU, RAM, espaço em disco, conexão e limites de execução do provedor. O yt-dlp suporta muitos sites, mas não garante qualquer URL. Vídeos privados, DRM, paywalls e links que exigem autenticação podem falhar. O suporte depende das regras e da disponibilidade de cada plataforma; o app não contorna proteção nem autenticação. Use somente vídeos que você tenha autorização para baixar e editar.
+## Publicar e gerar APK
 
-A nota de potencial viral é heurística e não garante visualizações.
+O Render publica o backend e a interface estática a partir da branch main. O GitHub Actions verifica a sintaxe JavaScript, valida o backend e compila o APK Android.
+
+1. Abra a aba Actions.
+2. Selecione Build CortaViral AI APK.
+3. Aguarde backend-check e build-apk terminarem com sucesso.
+4. Baixe o artefato cortaviral-ai-debug-apk, extraia e instale app-debug.apk.
+
+## Limites importantes
+
+- O histórico fica no armazenamento local do navegador/WebView neste aparelho. Limpar os dados do aplicativo pode apagá-lo.
+- Os arquivos de vídeo são enviados ao servidor para processamento; apenas o histórico fica local.
+- O YouTube pode bloquear extração automática e exigir autenticação. Alterar Python para JavaScript não remove esse bloqueio. Quando isso ocorrer, importe um arquivo de vídeo que você tenha autorização para editar.
+- Vídeos privados, protegidos por DRM ou que exijam login podem não funcionar.
+- A pontuação de potencial viral é heurística e não garante visualizações.
