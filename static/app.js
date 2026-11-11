@@ -8,6 +8,12 @@ let serverHealth = null;
 let serverOK = false;
 let toastTimer = null;
 function initialApiBase() {
+  const currentHost = location.hostname.toLowerCase();
+  if (currentHost.endsWith(".app.github.dev") || currentHost === "github.dev") {
+    localStorage.setItem("cortaviral_server_url", DEFAULT_SERVER);
+    if (location.origin !== DEFAULT_SERVER) location.replace(DEFAULT_SERVER + "/");
+    return DEFAULT_SERVER;
+  }
   const saved = localStorage.getItem("cortaviral_server_url");
   if (!saved) return location.origin;
   try { return normaliseServer(saved); }
@@ -394,6 +400,9 @@ function normaliseServer(value) {
   const forbidden = ["youtube.com","youtu.be","tiktok.com","instagram.com","facebook.com","x.com","twitter.com"];
   if (forbidden.some(domain => host === domain || host.endsWith("." + domain))) {
     throw new Error("Esse endereço parece ser de uma plataforma de vídeos. O endereço do servidor é diferente do link do vídeo.");
+  }
+  if (host.endsWith(".app.github.dev") || host === "github.dev") {
+    throw new Error("Esse endereço temporário do Codespaces não é mais usado pelo aplicativo. Use o servidor oficial do CortaViral AI.");
   }
   if (parsed.username || parsed.password) throw new Error("Não coloque usuário ou senha na URL do servidor.");
   return parsed.origin;
