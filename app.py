@@ -1,8 +1,9 @@
-import os, re, uuid, socket, ipaddress, subprocess, threading, math, json
+import os, re, uuid, socket, ipaddress, subprocess, threading, math, json, zipfile
 from pathlib import Path
 from urllib.parse import urlparse
 from fastapi import FastAPI, BackgroundTasks, HTTPException, UploadFile, File, Form
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 BASE = Path(__file__).resolve().parent
@@ -19,6 +20,7 @@ MAX_CLIP_SECONDS = 60
 class AnalyzeRequest(BaseModel):
     url: str
     clips: int = Field(5, ge=1, le=10)
+    aspect_ratio: str = Field("9:16", pattern=r"^(9:16|1:1|16:9)$")
 
 def update(job, **data):
     with LOCK:
@@ -87,6 +89,14 @@ def download(url, folder):
     except RuntimeError as error:
         detail = str(error)
         lowered = detail.lower()
+        if "sign in to confirm you" in lowered and "not a bot" in lowered:
+            raise RuntimeError(
+                "O YouTube bloqueou a leitura automática deste link e pediu confirmação de acesso. "
+                "Não precisamos da sua senha nem dos cookies da sua conta. "
+                "Para continuar, importe pela GALERIA o arquivo original do vídeo (por exemplo, "
+                "uma cópia sua salva no celular ou baixada pelo YouTube Studio). "
+                "Você também pode tentar um link público direto de arquivo MP4."
+            ) from error
         if is_tiktok and ("no video" in lowered or "video not available" in lowered
                           or "ip address is blocked" in lowered):
             raise RuntimeError(
@@ -255,7 +265,7 @@ def make_srt(segs, start, end, path):
         number += 1
     path.write_text("\n".join(lines), encoding="utf-8")
 
-def render(source, candidate, index, folder, segs):
+def render(source, candidate, index, folder, segs, aspect_ratio="9:16"):
     start, end = candidate["start"], candidate["end"]
     duration = end - start
     if not MIN_CLIP_SECONDS <= duration <= MAX_CLIP_SECONDS:
@@ -263,7 +273,9 @@ def render(source, candidate, index, folder, segs):
     output = OUT / f"{folder.name}_corte_{index:02}.mp4"
     srt = folder / f"clip_{index:02}.srt"
     make_srt(segs, start, end, srt)
-    video_filter = "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1"
+    dimensions = {"9:16": (1080, 1920), "1:1": (1080, 1080), "16:9": (1920, 1080)}
+    width, height = dimensions.get(aspect_ratio, dimensions["9:16"])
+    video_filter = f"scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height},setsar=1"
     if srt.exists() and srt.stat().st_size:
         srt_path = str(srt).replace("\\", "/").replace(":", "\\:")
         video_filter += (
@@ -290,7 +302,7 @@ def render(source, candidate, index, folder, segs):
         run(command, 1800)
     return output
 
-def process_source(job, clips, source, folder):
+def process_source(job, clips, source, folder, aspect_ratio="9:16"):
     total = duration_of(source)
     if total < MIN_CLIP_SECONDS:
         raise RuntimeError("O vídeo de origem precisa ter pelo menos 30 segundos.")
@@ -325,7 +337,7 @@ def process_source(job, clips, source, folder):
             progress=50 + int(45 * (index - 1) / max(1, len(chosen))),
             message=f"Renderizando corte {index} de {len(chosen)}…"
         )
-        file = render(source, candidate, index, folder, segs)
+        file = render(source, candidate, index, folder, segs, aspect_ratio)
         text = candidate["text"]
         results.append({
             "number": index,
@@ -351,14 +363,14 @@ def process(job, req):
     try:
         update(job, status="processing", progress=3, message="Validando link do YouTube, TikTok ou outra fonte compatível…")
         source = download(validate_url(req.url), folder)
-        process_source(job, req.clips, source, folder)
+        process_source(job, req.clips, source, folder, req.aspect_ratio)
     except Exception as error:
         update(job, status="error", progress=100, message=str(error)[:1800])
 
-def process_local_upload(job, clips, source, folder):
+def process_local_upload(job, clips, source, folder, aspect_ratio="9:16"):
     try:
         update(job, status="processing", progress=15, message="Vídeo recebido. Preparando análise…")
-        process_source(job, clips, source, folder)
+        process_source(job, clips, source, folder, aspect_ratio)
     except Exception as error:
         update(job, status="error", progress=100, message=str(error)[:1800])
 
@@ -366,10 +378,13 @@ def process_local_upload(job, clips, source, folder):
 async def analyze_upload(
     background: BackgroundTasks,
     file: UploadFile = File(...),
-    clips: int = Form(5)
+    clips: int = Form(5),
+    aspect_ratio: str = Form("9:16")
 ):
     if clips < 1 or clips > 10:
         raise HTTPException(400, "A quantidade de cortes precisa ficar entre 1 e 10.")
+    if aspect_ratio not in {"9:16", "1:1", "16:9"}:
+        raise HTTPException(400, "Formato inválido. Escolha 9:16, 1:1 ou 16:9.")
     filename = file.filename or "video.mp4"
     extension = Path(filename).suffix.lower()
     allowed = {".mp4", ".mov", ".mkv", ".webm", ".m4v", ".avi", ".flv", ".ts", ".mpg", ".mpeg", ".3gp", ".3g2"}
@@ -397,7 +412,7 @@ async def analyze_upload(
         destination.unlink(missing_ok=True)
         raise HTTPException(400, "O arquivo de vídeo está vazio.")
     update(job, status="queued", progress=5, message="Vídeo enviado. Entrando na fila…")
-    background.add_task(process_local_upload, job, clips, destination, folder)
+    background.add_task(process_local_upload, job, clips, destination, folder, aspect_ratio)
     return {"job_id": job}
 
 @app.post("/api/analyze")
@@ -407,6 +422,37 @@ def analyze(req: AnalyzeRequest, background: BackgroundTasks):
     update(job, status="queued", progress=0, message="Na fila…")
     background.add_task(process, job, req)
     return {"job_id": job}
+
+@app.get("/api/jobs/{job}/download-all")
+def download_all(job: str):
+    if not re.fullmatch(r"[a-f0-9]{12}", job):
+        raise HTTPException(400, "Identificador de análise inválido.")
+    with LOCK:
+        current = JOBS.get(job)
+        state = dict(current) if current is not None else None
+    if state is None:
+        state_file = WORK / job / "job.json"
+        if not state_file.is_file():
+            raise HTTPException(404, "Análise não encontrada ou tarefa expirada.")
+        try:
+            state = json.loads(state_file.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            raise HTTPException(500, "Não foi possível recuperar os resultados.")
+    if state.get("status") != "completed":
+        raise HTTPException(409, "Os cortes ainda não estão prontos para baixar.")
+    items = state.get("results", [])
+    archive = OUT / f"{job}_todos_os_cortes.zip"
+    added = 0
+    with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
+        for item in items:
+            filename = Path(urlparse(item.get("url", "")).path).name
+            candidate = OUT / filename
+            if filename and candidate.is_file():
+                bundle.write(candidate, arcname=f"CortaViral_corte_{int(item.get('number', added + 1)):02}.mp4")
+                added += 1
+    if added == 0:
+        raise HTTPException(404, "Nenhum arquivo de corte foi encontrado para esta análise.")
+    return FileResponse(archive, media_type="application/zip", filename="CortaViral_todos_os_cortes.zip")
 
 @app.get("/api/jobs/{job}")
 def status(job):
@@ -438,12 +484,15 @@ def health():
     return {
         "ok": True,
         "app": "CortaViral AI",
-        "version": "1.4",
+        "version": "1.5",
         "whisper_model": os.getenv("WHISPER_MODEL", "tiny"),
         "sources": ["youtube", "tiktok", "direct_video_url", "gallery_upload"],
         "clip_duration_seconds": {"minimum": MIN_CLIP_SECONDS, "maximum": MAX_CLIP_SECONDS},
         "upload_endpoint": "/api/analyze-upload",
-        "url_endpoint": "/api/analyze"
+        "url_endpoint": "/api/analyze",
+        "download_all_endpoint": "/api/jobs/{job_id}/download-all",
+        "aspect_ratios": ["9:16", "1:1", "16:9"],
+        "features": ["url_analysis", "gallery_upload", "automatic_subtitles", "batch_download", "multiple_aspect_ratios"]
     }
 
 app.mount("/outputs", StaticFiles(directory=str(OUT)), name="outputs")
