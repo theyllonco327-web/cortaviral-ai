@@ -399,9 +399,9 @@ def process_source(job, clips, source, folder, aspect_ratio="9:16", subtitles_en
         segs = []
         note = (
             "A transcrição não ficou disponível (" + str(error)[:220] +
-            "). Os cortes foram distribuídos por duração, sem análise semântica do conteúdo."
+            "). Os cortes serão classificados por movimento visual e duração, sem análise semântica do conteúdo."
         )
-    update(job, progress=45, message="Encontrando os melhores momentos entre 30 e 90 segundos…")
+    update(job, progress=45, message=f"Encontrando os melhores momentos entre {min_duration} e {max_duration} segundos…")
     options = candidates(segs, total, min_duration, max_duration, visual_samples)
     chosen = []
     for candidate in options:
@@ -413,7 +413,7 @@ def process_source(job, clips, source, folder, aspect_ratio="9:16", subtitles_en
         if len(chosen) >= clips:
             break
     if not chosen:
-        raise RuntimeError("Não encontramos trechos de 30 a 90 segundos neste vídeo. Tente outro vídeo ou uma quantidade menor de cortes.")
+        raise RuntimeError(f"Não encontramos trechos entre {min_duration} e {max_duration} segundos neste vídeo. Tente outra faixa de duração ou um vídeo mais longo.")
     chosen.sort(key=lambda item: item["start"])
     results = []
     for index, candidate in enumerate(chosen, 1):
