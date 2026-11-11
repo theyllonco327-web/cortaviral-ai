@@ -3,6 +3,8 @@ const HISTORY_KEY = "cortaviral_local_history_v1";
 let activeJob = "";
 let activeSource = "";
 let pollTimer = null;
+let API_BASE = (localStorage.getItem("cortaviral_server_url") || location.origin).replace(/\\/+$/, "");
+const apiUrl = path => API_BASE + path;
 
 function safeText(value) {
   return String(value ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -54,7 +56,7 @@ function showError(message) {
 async function checkServer() {
   const badge = $("connection");
   try {
-    const response = await fetch("/api/health", {cache:"no-store"});
+    const response = await fetch(apiUrl("/api/health"), {cache:"no-store"});
     const data = await response.json();
     if (!response.ok || !data.ok) throw new Error("Servidor indisponível");
     badge.className = "connection online";
@@ -84,9 +86,9 @@ async function startAnalysis() {
       form.append("file", file, file.name);
       form.append("clips", $("clipCount").value);
       form.append("aspect_ratio", $("aspectRatio").value);
-      response = await fetch("/api/analyze-upload", {method:"POST", body:form});
+      response = await fetch(apiUrl("/api/analyze-upload"), {method:"POST", body:form});
     } else {
-      response = await fetch("/api/analyze", {
+      response = await fetch(apiUrl("/api/analyze"), {
         method:"POST",
         headers:{"Content-Type":"application/json"},
         body:JSON.stringify({url, clips:Number($("clipCount").value), aspect_ratio:$("aspectRatio").value})
@@ -106,7 +108,7 @@ async function startAnalysis() {
 async function poll(jobId, startedAt) {
   try {
     if (Date.now() - startedAt > 35 * 60 * 1000) throw new Error("O processamento demorou mais que o limite de espera. Verifique a conexão e tente novamente.");
-    const response = await fetch("/api/jobs/" + encodeURIComponent(jobId), {cache:"no-store"});
+    const response = await fetch(apiUrl("/api/jobs/" + encodeURIComponent(jobId)), {cache:"no-store"});
     const job = await response.json();
     if (!response.ok) throw new Error(job.detail || "A tarefa não está mais ativa no servidor.");
     setProgress(job.message || "Processando…", job.progress || 0);
@@ -136,7 +138,7 @@ function renderResults(job, jobId, scroll) {
   $("resultsSummary").textContent = results.length + " corte(s) · " + safeText(job.transcript_note || "Análise concluída");
   $("scoreNote").textContent = job.score_note || "A pontuação é uma estimativa, não uma promessa de viralização.";
   $("resultGrid").innerHTML = results.map(clip => {
-    const videoUrl = new URL(clip.url, location.origin).href;
+    const videoUrl = new URL(clip.url, API_BASE + "/").href;
     const tags = (clip.reasons || []).map(reason => '<span class="tag">' + safeText(reason) + '</span>').join("");
     return `<article class="clip-card">
       <div class="clip-top"><div><h3>${safeText(clip.hook || "Melhor momento")}</h3><div class="clip-meta">${formatTime(clip.start)}–${formatTime(clip.end)} · ${Math.round(clip.duration || 0)}s</div></div><div class="score">${Number(clip.score)||0}</div></div>
@@ -148,7 +150,7 @@ function renderResults(job, jobId, scroll) {
   }).join("");
   $("downloadAll").onclick = () => {
     if (!jobId) return;
-    location.href = "/api/jobs/" + encodeURIComponent(jobId) + "/download-all";
+    location.href = apiUrl("/api/jobs/" + encodeURIComponent(jobId) + "/download-all");
   };
   if (scroll) $("resultsSection").scrollIntoView({behavior:"smooth", block:"start"});
 }
@@ -171,3 +173,25 @@ $("clearHistory").addEventListener("click", () => {
 $("videoUrl").addEventListener("keydown", event => { if (event.key === "Enter") startAnalysis(); });
 renderHistory();
 checkServer();
+
+$("settingsButton").addEventListener("click", () => {
+  $("serverUrl").value = API_BASE;
+  $("settingsModal").hidden = false;
+});
+$("closeSettings").addEventListener("click", () => { $("settingsModal").hidden = true; });
+$("settingsModal").addEventListener("click", event => {
+  if (event.target === $("settingsModal")) $("settingsModal").hidden = true;
+});
+$("saveSettings").addEventListener("click", () => {
+  try {
+    const parsed = new URL($("serverUrl").value.trim());
+    if (parsed.protocol !== "https:" || !parsed.hostname) throw new Error("Use um endereço HTTPS válido.");
+    const next = parsed.origin;
+    localStorage.setItem("cortaviral_server_url", next);
+    API_BASE = next;
+    $("settingsModal").hidden = true;
+    checkServer();
+  } catch (error) {
+    alert(error.message || "Endereço inválido. Use o endereço HTTPS do servidor.");
+  }
+});
