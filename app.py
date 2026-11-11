@@ -1,4 +1,4 @@
-import os, re, uuid, socket, ipaddress, subprocess, threading, math, zipfile
+import os, re, uuid, socket, ipaddress, subprocess, threading, math, zipfile, json, time
 from pathlib import Path
 from urllib.parse import urlparse
 from fastapi import FastAPI, BackgroundTasks, HTTPException, UploadFile, File, Form
@@ -24,11 +24,35 @@ class AnalyzeRequest(BaseModel):
     subtitles: bool = True
 
 def update(job, **data):
-    # O estado da tarefa fica apenas na memória enquanto o processamento ocorre.
-    # O histórico permanente das análises é guardado no SQLite privado do Android.
+    # Mantém cache em memória e um espelho JSON no disco temporário do servidor.
+    # Isso permite recuperar tarefas concluídas após reinício do processo, enquanto
+    # o volume temporário da instância continuar disponível.
     with LOCK:
         state = JOBS.setdefault(job, {})
         state.update(data)
+        state["updated_at"] = int(time.time())
+        folder = WORK / job
+        folder.mkdir(parents=True, exist_ok=True)
+        temporary = folder / "state.tmp"
+        temporary.write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
+        temporary.replace(folder / "state.json")
+
+
+def read_job(job):
+    with LOCK:
+        current = JOBS.get(job)
+        if current is not None:
+            return dict(current)
+    state_file = WORK / job / "state.json"
+    try:
+        data = json.loads(state_file.read_text(encoding="utf-8"))
+        if isinstance(data, dict):
+            with LOCK:
+                JOBS[job] = data
+            return dict(data)
+    except (OSError, ValueError, TypeError):
+        pass
+    return None
 
 def run(cmd, timeout=900):
     p = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
@@ -436,9 +460,7 @@ def analyze(req: AnalyzeRequest, background: BackgroundTasks):
 def download_all(job: str):
     if not re.fullmatch(r"[a-f0-9]{12}", job):
         raise HTTPException(400, "Identificador de análise inválido.")
-    with LOCK:
-        current = JOBS.get(job)
-        state = dict(current) if current is not None else None
+    state = read_job(job)
     if state is None:
         raise HTTPException(404, "Análise não está mais disponível no servidor. O histórico salvo no celular continua preservado.")
     if state.get("status") != "completed":
@@ -459,18 +481,17 @@ def download_all(job: str):
 
 @app.get("/api/jobs/{job}")
 def status(job):
-    with LOCK:
-        current = JOBS.get(job)
-        if current is None:
-            raise HTTPException(404, "Análise não está mais ativa no servidor. O histórico concluído permanece salvo no celular.")
-        return dict(current)
+    state = read_job(job)
+    if state is None:
+        raise HTTPException(404, "Análise não está mais ativa nesta instância. Envie o vídeo novamente; o histórico local do celular continua preservado.")
+    return state
 
 @app.get("/api/health")
 def health():
     return {
         "ok": True,
         "app": "CortaViral AI",
-        "version": "1.9",
+        "version": "2.0",
         "api_contract": "cortaviral-v1",
         "deployment_commit": os.getenv("RENDER_GIT_COMMIT", "unknown"),
         "whisper_model": os.getenv("WHISPER_MODEL", "tiny"),
