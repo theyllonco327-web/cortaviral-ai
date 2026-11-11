@@ -724,7 +724,9 @@ public final class WebMainActivity extends Activity {
         if (!candidate.contains("://")) candidate = "https://" + candidate;
         Uri uri = Uri.parse(candidate);
         String host = uri.getHost();
-        if (!"https".equalsIgnoreCase(uri.getScheme()) || host == null || isVideoPlatformHost(host)) {
+        if (!"https".equalsIgnoreCase(uri.getScheme()) || host == null || isVideoPlatformHost(host)
+                || host.toLowerCase(java.util.Locale.ROOT).endsWith(".app.github.dev")
+                || "github.dev".equalsIgnoreCase(host)) {
             Toast.makeText(this, "Endereço antigo ou inválido detectado. Usando o servidor oficial do CortaViral AI.", Toast.LENGTH_LONG).show();
             return DEFAULT_SERVER;
         }
