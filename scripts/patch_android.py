@@ -562,6 +562,8 @@ import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Handler;
+import android.os.Looper;
 import android.webkit.DownloadListener;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
@@ -577,6 +579,8 @@ public final class WebMainActivity extends Activity {
     private WebView webView;
     private ValueCallback<Uri[]> uploadCallback;
     private String serverHost = "cortaviral-ai.onrender.com";
+    private final Handler retryHandler = new Handler(Looper.getMainLooper());
+    private int automaticRetries = 0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -655,8 +659,23 @@ public final class WebMainActivity extends Activity {
             public void onReceivedHttpError(WebView view, WebResourceRequest request,
                                             android.webkit.WebResourceResponse response) {
                 if (request.isForMainFrame() && response.getStatusCode() >= 400) {
-                    showServerFallback("O servidor respondeu HTTP " + response.getStatusCode()
-                            + ". O endereço pode estar desatualizado ou a publicação ainda não terminou.");
+                    int status = response.getStatusCode();
+                    if (status == 503 && automaticRetries < 4) {
+                        automaticRetries++;
+                        showServerFallback("O Render está iniciando o servidor ou temporariamente indisponível. "
+                                + "O aplicativo tentará novamente em 20 segundos (tentativa "
+                                + automaticRetries + " de 4).");
+                        retryHandler.postDelayed(() -> {
+                            if (!isFinishing()) {
+                                setContentView(webView);
+                                webView.stopLoading();
+                                webView.loadUrl(DEFAULT_SERVER);
+                            }
+                        }, 20000);
+                    } else {
+                        showServerFallback("O servidor respondeu HTTP " + status
+                                + ". Se continuar assim, verifique o estado do serviço no Render.");
+                    }
                 }
             }
         });
@@ -707,6 +726,8 @@ public final class WebMainActivity extends Activity {
             retryParams.topMargin = 24;
             panel.addView(retry, retryParams);
             retry.setOnClickListener(v -> {
+                automaticRetries = 0;
+                retryHandler.removeCallbacksAndMessages(null);
                 getSharedPreferences("cortaviral_settings", MODE_PRIVATE)
                         .edit().putString("server_url", DEFAULT_SERVER).apply();
                 serverHost = Uri.parse(DEFAULT_SERVER).getHost();
@@ -787,6 +808,7 @@ public final class WebMainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        retryHandler.removeCallbacksAndMessages(null);
         if (uploadCallback != null) {
             uploadCallback.onReceiveValue(null);
             uploadCallback = null;
