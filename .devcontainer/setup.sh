@@ -15,6 +15,7 @@ export PATH="$HOME/.deno/bin:$PATH"
 python -m venv .venv
 .venv/bin/python -m pip install --upgrade pip
 .venv/bin/pip install --no-cache-dir -r requirements.txt
+.venv/bin/pip install --no-cache-dir -r requirements-streamlit.txt
 
 mkdir -p work outputs
 printf '\nCortaViral AI dependencies installed.\n'
