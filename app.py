@@ -65,6 +65,7 @@ def download(url, folder):
     # bloquear extrações automatizadas ou exigir que o vídeo seja público.
     host = (urlparse(url).hostname or "").lower()
     is_tiktok = host == "tiktok.com" or host.endswith(".tiktok.com")
+    is_youtube = host in {"youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be", "music.youtube.com"} or host.endswith(".youtube.com")
     command = [
         "yt-dlp", "--js-runtimes", "deno", "--no-playlist", "--no-warnings", "--no-progress",
         "--socket-timeout", "30", "--retries", "5",
@@ -89,13 +90,12 @@ def download(url, folder):
     except RuntimeError as error:
         detail = str(error)
         lowered = detail.lower()
-        if "sign in to confirm you" in lowered and "not a bot" in lowered:
+        if is_youtube and ("not a bot" in lowered or "sign in to confirm" in lowered or "confirm you’re not" in lowered):
             raise RuntimeError(
-                "O YouTube bloqueou a leitura automática deste link e pediu confirmação de acesso. "
+                "O YouTube bloqueou a leitura automática deste link. O servidor está funcionando, mas não recebeu o arquivo do vídeo. "
                 "Não precisamos da sua senha nem dos cookies da sua conta. "
-                "Para continuar, importe pela GALERIA o arquivo original do vídeo (por exemplo, "
-                "uma cópia sua salva no celular ou baixada pelo YouTube Studio). "
-                "Você também pode tentar um link público direto de arquivo MP4."
+                "Para continuar agora, use IMPORTAR VÍDEO DA GALERIA e selecione um arquivo de vídeo que você tenha autorização para editar. "
+                "Links do YouTube podem voltar a funcionar quando a plataforma liberar o acesso automático."
             ) from error
         if is_tiktok and ("no video" in lowered or "video not available" in lowered
                           or "ip address is blocked" in lowered):
@@ -365,7 +365,7 @@ def process(job, req):
         source = download(validate_url(req.url), folder)
         process_source(job, req.clips, source, folder, req.aspect_ratio)
     except Exception as error:
-        update(job, status="error", progress=100, message=str(error)[:1800])
+        update(job, status="error", progress=0, message=str(error)[:1800])
 
 def process_local_upload(job, clips, source, folder, aspect_ratio="9:16"):
     try:
@@ -484,7 +484,7 @@ def health():
     return {
         "ok": True,
         "app": "CortaViral AI",
-        "version": "1.5",
+        "version": "1.6",
         "whisper_model": os.getenv("WHISPER_MODEL", "tiny"),
         "sources": ["youtube", "tiktok", "direct_video_url", "gallery_upload"],
         "clip_duration_seconds": {"minimum": MIN_CLIP_SECONDS, "maximum": MAX_CLIP_SECONDS},
