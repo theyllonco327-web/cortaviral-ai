@@ -12,11 +12,12 @@ Aplicativo Android híbrido com **Java + HTML + CSS + JavaScript**.
 
 ## Recursos
 
-- Análise por URL pública compatível.
+- Download por URL usando os extratores automáticos do yt-dlp, com nova tentativa pelo extrator genérico para páginas comuns que falhem no primeiro método.
+- Suporte a diferentes sites e links diretos de vídeo quando o conteúdo estiver publicamente acessível e tecnicamente extraível.
 - Importação de vídeos da galeria Android.
 - Escolha de 1, 3, 5, 7 ou 10 cortes.
 - Formatos 9:16, 1:1 e 16:9.
-- Cortes de 30 a 60 segundos.
+- Cortes de 30 a 90 segundos; janelas automáticas procuram aproveitar a faixa até 90s.
 - Legendas automáticas quando a transcrição está disponível.
 - Pré-visualização e download dos cortes.
 - Histórico local no dispositivo, sem banco remoto de histórico.
@@ -35,6 +36,6 @@ O Render publica o backend e a interface estática a partir da branch main. O Gi
 
 - O histórico fica no armazenamento local do navegador/WebView neste aparelho. Limpar os dados do aplicativo pode apagá-lo.
 - Os arquivos de vídeo são enviados ao servidor para processamento; apenas o histórico fica local.
-- O YouTube pode bloquear extração automática e exigir autenticação. Alterar Python para JavaScript não remove esse bloqueio. Quando isso ocorrer, importe um arquivo de vídeo que você tenha autorização para editar.
+- A compatibilidade de URL é ampla, não universal: vídeos privados, DRM, paywalls, login obrigatório, URLs expiradas ou bloqueios da plataforma podem impedir o download. Não há tentativa de contornar essas proteções.
 - Vídeos privados, protegidos por DRM ou que exijam login podem não funcionar.
 - A pontuação de potencial viral é heurística e não garante visualizações.
