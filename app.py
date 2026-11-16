@@ -280,7 +280,7 @@ def phrase_boundary_quality(segment, next_segment=None):
     claramente suspensos quando há fala seguinte disponível.
     """
     text = str(segment.get("text", "")).strip()
-    words = re.findall(r"\\b[\\wÀ-ÿ'-]+\\b", text.lower())
+    words = re.findall(r"\b[\wÀ-ÿ'-]+\b", text.lower())
     if not words:
         return 0, "fim de fala não identificado"
 
