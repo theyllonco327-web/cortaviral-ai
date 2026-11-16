@@ -717,8 +717,8 @@ public final class WebMainActivity extends Activity {
                         while ((read = stream.read(chunk)) != -1) buffer.write(chunk, 0, read);
                         stream.close();
                         String body = buffer.toString("UTF-8");
-                        if (body.contains("CortaViral AI") || body.contains("\\"ok\\":true")
-                                || body.contains("\\"ok\\": true")) {
+                        if (body.contains("CortaViral AI") || body.contains("\"ok\":true")
+                                || body.contains("\"ok\": true")) {
                             retryHandler.post(() -> {
                                 if (!isFinishing() && webView != null) {
                                     retryHandler.removeCallbacksAndMessages(null);
