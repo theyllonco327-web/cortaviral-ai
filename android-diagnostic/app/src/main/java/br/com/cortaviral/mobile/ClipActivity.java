@@ -15,12 +15,14 @@ import java.util.Locale;
 public final class ClipActivity extends Activity {
     private static final int VIDEO = 91, SRT = 92;
     private final Handler handler = new Handler(Looper.getMainLooper());
-    private List<ClipPlan.Cue> cues = List.of();
+    private List<ClipPlan.Cue> cues = java.util.Collections.emptyList();
     private VideoView player;
     private TextView caption, result;
     private EditText start, end;
     private Button preview;
     private int duration;
+    private android.media.MediaPlayer prepared;
+    private boolean awaitingSeek;
     private int stopAt = -1;
     private boolean follow;
     private final Runnable render = new Runnable() {
@@ -66,16 +68,24 @@ public final class ClipActivity extends Activity {
         caption.setGravity(android.view.Gravity.CENTER);
         label(page,"A prévia roda no aparelho. Esta versão não exporta o vídeo nem gera legendas automaticamente.");
         player.setOnPreparedListener(mp -> {
+            prepared = mp;
+            mp.setOnSeekCompleteListener(current -> {
+                if (awaitingSeek && current == prepared) {
+                    awaitingSeek = false;
+                    follow = true;
+                    player.start();
+                }
+            });
             duration = mp.getDuration();
             start.setText("0");
             end.setText(seconds(Math.min(duration,30_000)));
             preview.setEnabled(duration > 0);
             result.setText("Vídeo pronto · " + seconds(duration) + " s");
-            player.seekTo(1);
+
         });
         player.setOnCompletionListener(mp -> { follow=false; caption.setText(""); });
         player.setOnErrorListener((mp,what,extra)->{
-            preview.setEnabled(false); follow=false;
+            preview.setEnabled(false); follow=false; awaitingSeek=false; prepared=null;
             result.setText("O Android não conseguiu abrir este vídeo.");
             return true;
         });
@@ -106,7 +116,7 @@ public final class ClipActivity extends Activity {
         if (code!=RESULT_OK || data==null || data.getData()==null) return;
         Uri uri=data.getData();
         if(request==VIDEO) {
-            follow=false; duration=0; preview.setEnabled(false); cues=List.of(); caption.setText("");
+            follow=false; awaitingSeek=false; prepared=null; duration=0; preview.setEnabled(false); cues=java.util.Collections.emptyList(); caption.setText("");
             result.setText("Abrindo vídeo…"); player.setVideoURI(uri);
         } else if (request==SRT) {
             try (InputStream stream=getContentResolver().openInputStream(uri)) {
@@ -137,8 +147,12 @@ public final class ClipActivity extends Activity {
             if (a>=b) throw new NumberFormatException();
             ClipPlan.Range range=ClipPlan.adjust(a,b,duration,cues);
             stopAt=range.end();
-            follow=true;
-            player.pause(); player.seekTo(range.start()); player.start();
+            if (prepared == null || awaitingSeek) return;
+            follow=false;
+            caption.setText("");
+            player.pause();
+            awaitingSeek=true;
+            prepared.seekTo(range.start(), android.media.MediaPlayer.SEEK_CLOSEST);
             result.setText("Trecho · "+seconds(range.start()).replace('.',',')+" a "
                    +seconds(range.end()).replace('.',',')+" s"
                    +(a==range.start() && b==range.end() ? "" : " · ajustado pela legenda"));
@@ -147,5 +161,5 @@ public final class ClipActivity extends Activity {
         }
     }
     @Override protected void onResume() { super.onResume(); handler.removeCallbacks(render); handler.post(render); }
-    @Override protected void onPause() { handler.removeCallbacks(render); follow=false; player.pause(); super.onPause(); }
+    @Override protected void onPause() { handler.removeCallbacks(render); follow=false; awaitingSeek=false; player.pause(); super.onPause(); }
 }

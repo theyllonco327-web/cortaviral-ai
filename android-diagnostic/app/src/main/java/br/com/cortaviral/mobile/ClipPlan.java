@@ -15,9 +15,9 @@ final class ClipPlan {
     static List<Cue> parse(String raw) {
         List<Cue> cues = new ArrayList<>();
         for (String block : raw.replace("\r","").replace("\uFEFF","").split("\\n[ \\t]*\\n")) {
-            String[] lines = block.strip().split("\\n");
+            String[] lines = block.trim().split("\\n");
             for (int i = 0; i < Math.min(2, lines.length - 1); i++) {
-                Matcher m = TIMING.matcher(lines[i].strip());
+                Matcher m = TIMING.matcher(lines[i].trim());
                 if (!m.matches()) continue;
                 int start = time(m, 1), end = time(m, 5);
                 StringBuilder caption = new StringBuilder();
@@ -63,7 +63,7 @@ final class ClipPlan {
     }
 
     private static boolean endsSentence(String value) {
-        String text = value.replaceAll("[\\p{Pe}\\p{Pf}]+", "").stripTrailing();
+        String text = value.replaceAll("[\\p{Pe}\\p{Pf}]+", "").trim();
         return !text.isEmpty() && ".!?…".indexOf(text.charAt(text.length()-1)) >= 0;
     }
 
