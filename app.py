@@ -263,6 +263,44 @@ def score_text(text, seconds, speech):
         reasons.append("ênfase na fala")
     return max(0, min(100, score)), reasons or ["trecho com fala contínua"]
 
+INCOMPLETE_ENDINGS = {
+    "a", "as", "o", "os", "um", "uma", "uns", "umas", "de", "do", "da",
+    "dos", "das", "em", "no", "na", "nos", "nas", "com", "por", "para",
+    "pra", "que", "porque", "quando", "se", "mas", "e", "ou", "como",
+    "sobre", "até", "sem", "ao", "aos", "pela", "pelo", "pelas", "pelos",
+    "meu", "minha", "seu", "sua", "esse", "essa", "este", "esta",
+    "ele", "ela", "eles", "elas", "eu", "nós", "vocês", "você"
+}
+
+def phrase_boundary_quality(segment, next_segment=None):
+    """Estima se o trecho termina numa fronteira de fala natural.
+
+    Não substitui revisão humana nem compreensão semântica profunda. Usa
+    pontuação, palavras finais e continuidade temporal para evitar cortes
+    claramente suspensos quando há fala seguinte disponível.
+    """
+    text = str(segment.get("text", "")).strip()
+    words = re.findall(r"\\b[\\wÀ-ÿ'-]+\\b", text.lower())
+    if not words:
+        return 0, "fim de fala não identificado"
+
+    last = words[-1]
+    terminal_punctuation = bool(re.search(r"[.!?…][\"'’”)]*$", text))
+    if terminal_punctuation:
+        return 2, "termina em pontuação"
+
+    if last in INCOMPLETE_ENDINGS:
+        return -3, "possível frase incompleta"
+
+    if next_segment:
+        gap = float(next_segment.get("start", 0)) - float(segment.get("end", 0))
+        if gap < 0.9:
+            return -2, "fala continua no trecho seguinte"
+        if gap >= 0.9:
+            return 1, "pausa natural na fala"
+
+    return 0, "fim de fala sem pontuação conclusiva"
+
 def candidates(segs, total, min_duration=MIN_CLIP_SECONDS, max_duration=MAX_CLIP_SECONDS, visual_samples=None):
     found = []
     visual_samples = visual_samples or []
@@ -301,7 +339,17 @@ def candidates(segs, total, min_duration=MIN_CLIP_SECONDS, max_duration=MAX_CLIP
             speech = sum(max(0, x["end"] - x["start"]) for x in part)
             if len(text.split()) < 15:
                 continue
+
+            next_segment = segs[j + 1] if j + 1 < len(segs) else None
+            boundary_score, boundary_reason = phrase_boundary_quality(segs[j], next_segment)
+            # Se a fala parece continuar e ainda há espaço no limite máximo,
+            # amplia a janela em vez de escolher um corte suspenso.
+            if boundary_score <= -2 and next_segment and length < max_duration - 1:
+                continue
+
             score, reasons = score_text(text, length, speech)
+            score = max(0, min(100, score + boundary_score * 7))
+            reasons.append(boundary_reason)
             visual_score = visual_window_score(visual_samples, start, end)
             if visual_score:
                 score = min(100, score + visual_score)
