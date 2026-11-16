@@ -25,8 +25,10 @@ jobs:
         with:
           gradle-version: '8.9'
           cache-disabled: true
-      - name: Instalar SDK Android
-        run: sdkmanager 'platforms;android-35' 'build-tools;34.0.0'
+      - name: Conferir SDK Android pré-instalado
+        run: |
+          test -f "${ANDROID_HOME}/platforms/android-35/android.jar"
+          test -x "${ANDROID_HOME}/build-tools/34.0.0/apksigner"
       - name: Testar lógica Java
         run: bash scripts/test-logic.sh
       - name: Compilar APK de teste
