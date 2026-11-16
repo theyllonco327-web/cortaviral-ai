@@ -1,0 +1,21 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION"/>
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    <queries>
+        <package android:name="com.google.android.youtube"/>
+        <package android:name="com.zhiliaoapp.musically"/>
+    </queries>
+    <application android:theme="@style/AppTheme" android:label="CortaViral AI" android:allowBackup="false" android:usesCleartextTraffic="false" android:allowAudioPlaybackCapture="true" android:icon="@android:drawable/ic_media_play">
+        <activity android:name=".MainActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+        <service android:name=".CaptureService" android:exported="false" android:foregroundServiceType="mediaProjection"/>
+    </application>
+</manifest>

@@ -1,0 +1,42 @@
+name: Compilar APK de diagnóstico
+on:
+  push:
+    branches: [android-diagnostic]
+    paths:
+      - 'android-diagnostic/**'
+      - '.github/workflows/cortaviral-android-diagnostic.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+defaults:
+  run:
+    working-directory: android-diagnostic
+jobs:
+  apk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+          cache-disabled: true
+      - name: Instalar SDK Android
+        run: sdkmanager 'platforms;android-35' 'build-tools;34.0.0'
+      - name: Testar lógica Java
+        run: bash scripts/test-logic.sh
+      - name: Compilar APK de teste
+        run: gradle --no-daemon :app:assembleDebug
+      - name: Verificar assinatura e preparar arquivo
+        run: |
+          "${ANDROID_HOME}/build-tools/34.0.0/apksigner" verify --verbose app/build/outputs/apk/debug/app-debug.apk
+          cp app/build/outputs/apk/debug/app-debug.apk CortaViral-AI-Diagnostico.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CortaViral-AI-Diagnostico
+          path: android-diagnostic/CortaViral-AI-Diagnostico.apk
+          if-no-files-found: error
