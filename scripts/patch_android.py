@@ -590,7 +590,7 @@ public final class WebMainActivity extends Activity {
 
         String saved = getSharedPreferences("cortaviral_settings", MODE_PRIVATE)
                 .getString("server_url", DEFAULT_SERVER);
-        String startUrl = normalizeServer(saved);
+        String startUrl = normalizeServer(saved) + "app/";
         Uri startUri = Uri.parse(startUrl);
         if (startUri.getHost() != null) serverHost = startUri.getHost();
 
@@ -669,7 +669,7 @@ public final class WebMainActivity extends Activity {
                             if (!isFinishing()) {
                                 setContentView(webView);
                                 webView.stopLoading();
-                                webView.loadUrl(DEFAULT_SERVER);
+                                checkBackend(DEFAULT_SERVER + "app/");
                             }
                         }, 20000);
                     } else {
@@ -690,7 +690,62 @@ public final class WebMainActivity extends Activity {
         });
 
         setContentView(webView);
-        webView.loadUrl(startUrl);
+        showServerFallback("Conectando ao servidor oficial do CortaViral AI. Verificando se o Render terminou de iniciar…");
+        checkBackend(startUrl);
+    }
+
+    private void checkBackend(String appUrl) {
+        new Thread(() -> {
+            int attempt = 0;
+            while (!isFinishing() && attempt < 24) {
+                attempt++;
+                java.net.HttpURLConnection connection = null;
+                try {
+                    String base = appUrl.substring(0, appUrl.indexOf("/app/") + 1);
+                    java.net.URL healthUrl = new java.net.URL(base + "api/health");
+                    connection = (java.net.HttpURLConnection) healthUrl.openConnection();
+                    connection.setRequestMethod("GET");
+                    connection.setConnectTimeout(10000);
+                    connection.setReadTimeout(10000);
+                    connection.setUseCaches(false);
+                    int status = connection.getResponseCode();
+                    if (status == 200) {
+                        java.io.InputStream stream = connection.getInputStream();
+                        java.io.ByteArrayOutputStream buffer = new java.io.ByteArrayOutputStream();
+                        byte[] chunk = new byte[2048];
+                        int read;
+                        while ((read = stream.read(chunk)) != -1) buffer.write(chunk, 0, read);
+                        stream.close();
+                        String body = buffer.toString("UTF-8");
+                        if (body.contains("CortaViral AI") || body.contains("\\"ok\\":true")
+                                || body.contains("\\"ok\\": true")) {
+                            retryHandler.post(() -> {
+                                if (!isFinishing() && webView != null) {
+                                    retryHandler.removeCallbacksAndMessages(null);
+                                    automaticRetries = 0;
+                                    setContentView(webView);
+                                    webView.loadUrl(appUrl);
+                                }
+                            });
+                            return;
+                        }
+                    }
+                } catch (Exception ignored) {
+                    // Render pode estar acordando. Não abrimos a tela técnica de inicialização.
+                } finally {
+                    if (connection != null) connection.disconnect();
+                }
+                try {
+                    Thread.sleep(Math.min(15000, 3000 + attempt * 500L));
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+            }
+            retryHandler.post(() -> showServerFallback(
+                    "O servidor não respondeu ao teste de saúde após várias tentativas. " +
+                    "O APK está ativo, mas o backend do Render precisa estar disponível. Toque em reconectar."));
+        }).start();
     }
 
     private void showServerFallback(String message) {
