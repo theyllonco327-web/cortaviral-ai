@@ -64,7 +64,10 @@ public final class MainActivity extends Activity {
         stop.setOnClickListener(v->startService(new Intent(this,CaptureService.class).setAction(CaptureService.STOP)));
         status=title(card,"Nenhum teste realizado.",15,WHITE,false);
         status.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
-        title(page,"Abra o resultado depois de deixar a live tocar por cerca de 20 segundos. Use um trecho com fala e movimento. Este diagnóstico não grava arquivos nem gera clipes.",14,MUTED,false);
+        title(page,"Abra o resultado depois de deixar a live tocar por cerca de 20 segundos. Use um trecho com fala e movimento. O teste de live não grava arquivos.",14,MUTED,false);
+        Button studio=new Button(this);studio.setAllCaps(false);studio.setText("Abrir prévia de corte");
+        page.addView(studio,new LinearLayout.LayoutParams(-1,-2));
+        studio.setOnClickListener(v->startActivity(new Intent(this,ClipActivity.class)));
         if(state!=null){
             run=state.getString("run","");
             String old=state.getString("source");
